@@ -1,0 +1,16 @@
+---
+title: "Test1"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+source("common2.R")
+stuff <- read.gct("Achilles_v3.3.8_rawreadcounts.gct")$data
+print(head(stuff))
+```

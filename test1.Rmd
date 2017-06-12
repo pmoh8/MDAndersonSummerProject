@@ -11,6 +11,6 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 source("common2.R")
-stuff <- read.gct("Achilles_v3.3.8_rawreadcounts.gct")$data
-print(head(stuff))
+stuff <- read.gct("CCLE_Expression_Entrez_2012-09-29.gct")$data
+print(head(stuff,10))
 ```

@@ -1,14 +1,34 @@
----
-title: "Test1"
-runtime: shiny
-output: html_document
----
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
-
-```{r, echo = F}
+# library(shiny)
+# ui <- fluidPage(
+#   "hello world",
+#   sliderInput(inputId = "mynum",
+#               label = "choose some integer",
+#               value = 25, min = 1, max = 100),
+#   textInput(inputId="mytitle",
+#             label="type a title"),
+#   actionButton(inputId="clicks",label="click me"),
+#   plotOutput("myhist"),
+#   verbatimTextOutput("stats"),
+#   textOutput("numofclicks")
+# )
+# 
+# server <-function(input, output){
+#   myvector <- reactive({as.integer(10*rnorm(input$mynum))})
+#   output$myhist <- renderPlot({
+#     hist(myvector(),
+#          breaks = 20,
+#          xlim=c(-30,30),
+#          ylim=c(0,15),
+#          sub = isolate(input$mytitle),
+#         main = paste(input$mynum, "random normally distributed variables lol"))
+#   }) 
+#   output$stats <- renderPrint({
+#     summary(myvector())
+#   })
+#   observeEvent(input$clicks,{print(as.numeric(input$clicks))})
+#   output$numofclicks <- renderText(paste(as.numeric(input$clicks), "clicks so far"))
+# }
+# shinyApp(ui = ui, server = server)
 library(shiny) 
 ui <- 
   fluidPage( 
@@ -89,42 +109,12 @@ ui <-
         )
       )
     )
+    
   )
+
 server <- function(input, output) { 
   output$hist<- renderPlot({ 
     hist(rnorm(input$n)) 
   }) 
 }
 shinyApp(ui = ui, server = server)
-```
-```{r, eval=F, echo = F}
-
-
-source("common2.R")
-stuff <- read.gct("Achilles_v3.3.8_rawreadcounts.gct")$data
-stuff <- read.table("CCLE_copynumber_byGene_2013-12-03.txt",sep ="\t",header=T)
-annotation <- read.table("CCLE_sample_info_file_2012-10-18.txt",sep ="\t",header=T)
-
-list <- annotation[,c("CCLE.name","Site.Primary")]
-list <- split(list[,"CCLE.name"],list[,"Site.Primary"])
-stuff1 <- do.call(cbind, lapply(list, function(x){
-  rowMeans(stuff[,as.character(x)])
-}))
-
-
-underscore <- regexpr("_",colnames(stuff))
-cell_lines <- substring(colnames(stuff), 1, underscore-1)
-cancer_type <- substring(colnames(stuff), underscore+1)
-skin <- stuff[,grep("EGID|SYMBOL|CHR|CHRLOC|CHRLOCEND|SKIN", colnames(stuff))]
-
-for(i in cell_lines){
-  columns <- grep(i, colnames(stuff))
-  
-}
-
-
-table(list$Site.Primary)
-
-correlations <- cor(stuff[,6:30])
-heatmap(correlations,margins=c(10,10))
-```

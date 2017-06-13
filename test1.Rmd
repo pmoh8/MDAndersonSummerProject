@@ -10,7 +10,91 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
+library(shiny) 
+ui <- 
+fluidPage( 
+   titlePanel("Cool Application"),
+
+  sidebarLayout(
+    
+    sidebarPanel(
+      fluidRow(
+        column(4),
+        column(4, "x-axis"),
+        column(4, "y-axis")
+      ),
+      fluidRow(
+        column(4,
+               "Data type"),
+        column(4,
+               selectInput("variable", "Variable:",
+                c("Cylinders" = "cyl",
+                  "Transmission" = "am",
+                  "Gears" = "gear"))),
+        column(4,
+               selectInput("variable", "Variable:",
+                c("Cylinders" = "cyl",
+                  "Transmission" = "am",
+                  "Gears" = "gear")))
+      ),
+      fluidRow(
+        column(4,
+               "Gene"),
+        column(4,
+               selectInput("variable", "Variable:",
+                c("Cylinders" = "cyl",
+                  "Transmission" = "am",
+                  "Gears" = "gear"))),
+        column(4,
+               selectInput("variable", "Variable:",
+                c("Cylinders" = "cyl",
+                  "Transmission" = "am",
+                  "Gears" = "gear")))
+      )
+    
+    ),
+    mainPanel(
+      tabsetPanel(
+        tabPanel("Scatterplot", plotOutput("plot")), 
+        tabPanel("Heatmap", verbatimTextOutput("summary"))
+      )
+    )
+  )
+  
+)
+
+server <- function(input, output) { 
+  output$hist<- renderPlot({ 
+      hist(rnorm(input$n)) 
+    }) 
+}
+shinyApp(ui = ui, server = server)
+
 source("common2.R")
-stuff <- read.gct("CCLE_Expression_Entrez_2012-09-29.gct")$data
-print(head(stuff,10))
+stuff <- read.gct("Achilles_v3.3.8_rawreadcounts.gct")$data
+stuff <- read.table("CCLE_copynumber_byGene_2013-12-03.txt",sep ="\t",header=T)
+annotation <- read.table("CCLE_sample_info_file_2012-10-18.txt",sep ="\t",header=T)
+
+list <- annotation[,c("CCLE.name","Site.Primary")]
+list <- split(list[,"CCLE.name"],list[,"Site.Primary"])
+stuff1 <- do.call(cbind, lapply(list, function(x){
+  rowMeans(stuff[,as.character(x)])
+}))
+
+
+underscore <- regexpr("_",colnames(stuff))
+cell_lines <- substring(colnames(stuff), 1, underscore-1)
+cancer_type <- substring(colnames(stuff), underscore+1)
+skin <- stuff[,grep("EGID|SYMBOL|CHR|CHRLOC|CHRLOCEND|SKIN", colnames(stuff))]
+
+for(i in cell_lines){
+  columns <- grep(i, colnames(stuff))
+  
+}
+
+
+table(list$Site.Primary)
+
+correlations <- cor(stuff[,6:30])
+heatmap(correlations,margins=c(10,10))
 ```

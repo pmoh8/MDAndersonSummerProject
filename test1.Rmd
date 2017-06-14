@@ -1,16 +1,220 @@
 ---
 title: "Test1"
-output:
-  html_document: default
-  pdf_document: default
+runtime: shiny
+output: html_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r}
+```{r, eval = T, echo = F}
+library(shiny)
+library(ggplot2)
+#User Interface
+ui <- 
+  fluidPage( 
+    #Set up tabs
+    titlePanel("Cool Application"),
+    
+    sidebarLayout("",
+      mainPanel(width = 12,
+        tabsetPanel(
+          #BEGIN SCATTERPLOT TAB
+          tabPanel("Scatterplot", 
+                   br(),
+                   fluidRow(
+                     #Column for user controls (selecting which pieces of data to view and highlight)
+                     column(3,
+                            wellPanel(
+                              #labels for data selection options
+                              fluidRow(
+                                column(2),
+                                column(5, "x-axis"),
+                                column(5, "y-axis")
+                                ),
+                              #row to select data types to view (such as RNAseq or DNA copy number)
+                              fluidRow(
+                                column(2,
+                                       "Data"),
+                                #input to select which data type is displayed on the x-axis
+                                column(5,
+                                       selectInput("datatype_x", NULL,
+                                                   c("mRNA Expression"))
+                                       ),
+                                #input to select which data type is displayed on the y-axis
+                                column(5,
+                                       selectInput("datatype_y", NULL,
+                                                   c("Data1" = "data1",
+                                                     "Data2" = "data2",
+                                                     "Data3" = "data3")))
+                                ),
+                              #row to select which gene to view
+                              fluidRow(
+                                column(2,"Gene"),
+                                #input to select which gene is displayed on the x-axis
+                                column(5,
+                                       selectInput("gene_x", NULL,
+                                                   c("Gene1" = "gene1",
+                                                     "Gene2" = "gene2",
+                                                     "Gene3" = "gene3"))
+                                       ),
+                                #input to select which gene is displayed on the y-axis
+                                column(5,
+                                       selectInput("gene_y", NULL,
+                                                   c("Gene1" = "gene1",
+                                                     "Gene2" = "gene2",
+                                                     "Gene3" = "gene3")))
+                                )
+                              ),
+                            br(),
+                            "Select a cancer type to highlight",
+                            selectInput("variable", NULL,
+                                        c("Cancer1" = "cancer1",
+                                          "Cancer2" = "cancer2",
+                                          "Cancer3" = "cancer3")),
+                            checkboxInput("showSelected", "Show selected cancers only?", FALSE)
+                            ),
+                     #main column to display scatterplot and details for a selected point on the scatterplot)
+                     column(9,
+                            fluidRow(
+                              #display scatterplot and details of the left plot ("zoomed-out" plot)
+                              column(6, 
+                                     #display details
+                                     fluidRow(column(1),
+                                              column(10,
+                                                     wellPanel("Details 1a (cell line, cancer type)"))),
+                                     fluidRow(column(1),
+                                              column(10,
+                                                     wellPanel("Details 1b (rnaseq info, dna copy, etc)",
+                                                               verbatimTextOutput("click_info")
+                                                               )
+                                                     )
+                                              ),
+                                     #display "zoomed-out" plot
+                                     fluidRow(
+                                       column(12,
+                                              wellPanel(
+                                                plotOutput("plot",
+                                                           click = "plot_click",
+                                                           brush = brushOpts(id="plot_brush")
+                                                           )
+                                                ),
+                                              "plot1")
+                                     )
+                              ), 
+                              #display scatterplot and details of the right plot ("zoomed-in" plot)
+                              column(6,
+                                     #only display the right-side panel IF the user has selected some area on the left plot
+                                     conditionalPanel(condition = 'output.brushActive != 0',
+                                       #display details
+                                       fluidRow(column(1),
+                                              column(10,
+                                                     wellPanel("Details a2 (cell line, cancer type)")
+                                                     )
+                                              ),
+                                        fluidRow(column(1),
+                                              column(10,
+                                                     wellPanel("Details 2b (rnaseq info, dna copy, etc)",
+                                                               verbatimTextOutput("zoom_click_info")
+                                                               )
+                                                     )
+                                              ),
+                                       #display plot
+                                       fluidRow(column(12,
+                                                     wellPanel(
+                                                       plotOutput("plot_zoom",
+                                                                  click = "plot_zoom_click")),"plot2")
+                                              )
+                                       )
+                                     )
+                              #please help I can't figure out which end parenthasis goes with what
+                            )
+                     )
+                   )
+          ),
+          #END SCATTERPLOT DISPLAY
+          tabPanel("Heatmap", verbatimTextOutput("summary"))
+        )
+      )
+    )
+  )
+server <- function(input, output) {
+  #values for event flags
+  flags <- reactiveValues(brushActive = 1)
+  output$brushActive <- renderText(1) #reactive({ return(flags$brushActive) })
+  outputOptions(output, name = "brushActive", suspendWhenHidden = FALSE)
+  #check flags and whatnot
+  observeEvent(zoomdata, {
+   if(!(is.null(zoomdata))) {
+     flags$brushActive <- 1 
+   }
+  })
+  
+  observeEvent(input$plot_click,{
+    zoomdata <- NULL
+    flags$brushActive <- 0
+  })      
+  
+#BEGIN TEST VALUES
+  x <- rnorm(500)
+  y <- rnorm(500)
+  testdata <- data.frame(x = x, y = y)
+  zoomdata
+#END TEST VALUES
+  
+  #output the left/"zoomed-out" plot
+  output$plot<- renderPlot({ 
+    ggplot(testdata, aes(x,y, alpha=.5, color="blue")) + geom_point(aes(alpha=.5, color="blue"))
+    #qplot(testdata$x,testdata$y, alpha = .50, color = "blue") 
+  }) 
+  #output data associated with the selected point on the left/"zoomed-out" plot
+  output$click_info <- renderPrint({
+    nearPoints(testdata, input$plot_click, maxpoints = 1)
+  })
+  #output the right/"zoomed-out" plot
+  output$plot_zoom<- renderPlot({ 
+    zoomdata <- brushedPoints(testdata,input$plot_brush)
+    ggplot(zoomdata, aes(x,y, alpha=.5, color="blue")) + geom_point(aes(alpha=.5, color="blue"))
+  }) 
+  #output data associated with the selected point on the right/"zoomed-in" plot
+  output$zoom_click_info <- renderPrint({
+    nearPoints(testdata, input$plot_zoom_click, maxpoints = 1)
+  })
+
+}
+shinyApp(ui = ui, server = server)
+```
+```{r, eval = F}
 source("common2.R")
-stuff <- read.gct("CCLE_Expression_Entrez_2012-09-29.gct")$data
-print(head(stuff,10))
+stuff <- read.gct("Achilles_v3.3.8_rawreadcounts.gct")$data
+stuff <- read.table("CCLE_copynumber_byGene_2013-12-03.txt",sep ="\t",header=T)
+print(stuff)
+
+# annotation <- read.table("CCLE_sample_info_file_2012-10-18.txt",sep ="\t",header=T)
+# 
+# list <- annotation[,c("CCLE.name","Site.Primary")]
+# list <- split(list[,"CCLE.name"],list[,"Site.Primary"])
+# print(list)
+# stuff1 <- do.call(cbind, lapply(list, function(x){
+#    rowMeans(stuff[,as.character(x)])
+#  }))
+
+# 
+# 
+# underscore <- regexpr("_",colnames(stuff))
+# cell_lines <- substring(colnames(stuff), 1, underscore-1)
+# cancer_type <- substring(colnames(stuff), underscore+1)
+# skin <- stuff[,grep("EGID|SYMBOL|CHR|CHRLOC|CHRLOCEND|SKIN", colnames(stuff))]
+# 
+# for(i in cell_lines){
+#   columns <- grep(i, colnames(stuff))
+#   
+# }
+# 
+# 
+# table(list$Site.Primary)
+
+#correlations <- cor(stuff[,6:30])
+#heatmap(correlations,margins=c(10,10))
 ```

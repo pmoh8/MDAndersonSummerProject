@@ -1,0 +1,101 @@
+---
+title: "Test2"
+runtime: shiny
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This R Markdown document is made interactive using Shiny. Unlike the more traditional workflow of creating static reports, you can now create documents that allow your readers to change the assumptions underlying your analysis and see the results immediately. 
+
+To learn more, see [Interactive Documents](http://rmarkdown.rstudio.com/authoring_shiny.html).
+
+## Inputs and Outputs
+
+You can embed Shiny inputs and outputs in your document. Outputs are automatically updated whenever inputs change.  This demonstrates how a standard R plot can be made interactive by wrapping it in the Shiny `renderPlot` function. The `selectInput` and `sliderInput` functions create the input widgets used to drive the plot.
+
+```{r eruptions, echo=FALSE}
+library(shiny) 
+ui <- 
+  fluidPage( 
+    titlePanel("Cool Application"),
+    
+    sidebarLayout("",
+      mainPanel(width = 12,
+        tabsetPanel(
+          tabPanel("Scatterplot", 
+                   br(),
+                   fluidRow(
+                     column(3,
+                            wellPanel(
+                              fluidRow(
+                                column(2),
+                                column(5, "x-axis"),
+                                column(5, "y-axis")
+                                ),
+                              fluidRow(
+                                column(2,
+                                       "Data"),
+                                column(5,
+                                       selectInput("variable", NULL,
+                                                   c("Data1" = "cyl",
+                                                     "Data2" = "am",
+                                                     "Data3" = "gear"))
+                                       ),
+                                column(5,
+                                       selectInput("variable", NULL,
+                                                   c("Data1" = "cyl",
+                                                     "Data2" = "am",
+                                                     "Data3" = "gear")))
+                                ),
+                              fluidRow(
+                                column(2,"Gene"),
+                                column(5,
+                                       selectInput("variable", NULL,
+                                                   c("Gene1" = "cyl",
+                                                     "Gene2" = "am",
+                                                     "Gene3" = "gear"))
+                                       ),
+                                column(5,
+                                       selectInput("variable", NULL,
+                                                   c("Gene1" = "cyl",
+                                                     "Gene2" = "am",
+                                                     "Gene3" = "gear")))
+                                )
+                              ),
+                            br(),
+                            "Select a cancer type to highlight",
+                            selectInput("variable", NULL,
+                                        c("Cancer1" = "cyl",
+                                          "Cancer2" = "am",
+                                          "Cancer3" = "gear")),
+                            checkboxInput("somevalue", "Show selected cancers only?", FALSE)
+                            ),
+                     column(9,
+                            fluidRow(
+                              column(6, 
+                                     wellPanel("Details1")),
+                              column(6,
+                                     wellPanel("Details2"))
+                              ),
+                            fluidRow(
+                              column(6,
+                                     wellPanel(plotOutput("plot")),
+                                     "plot1"),
+                              column(6,
+                                     wellPanel(plotOutput("plot")),
+                                     "plot2")
+                              ),
+                            "hi"
+                            )
+                     )
+                   ),
+                   
+          tabPanel("Heatmap", verbatimTextOutput("summary"))
+        )
+      )
+    )
+  )
+```

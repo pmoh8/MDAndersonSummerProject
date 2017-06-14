@@ -9,78 +9,109 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r, echo = F}
-library(shiny) 
+library(shiny)
+#User Interface
 ui <- 
   fluidPage( 
+    #Set up tabs
     titlePanel("Cool Application"),
     
     sidebarLayout("",
       mainPanel(width = 12,
         tabsetPanel(
+          #BEGIN SCATTERPLOT TAB
           tabPanel("Scatterplot", 
                    br(),
                    fluidRow(
+                     #Column for user controls (selecting which pieces of data to view and highlight)
                      column(3,
                             wellPanel(
+                              #labels for data selection options
                               fluidRow(
                                 column(2),
                                 column(5, "x-axis"),
                                 column(5, "y-axis")
                                 ),
+                              #row to select data types to view (such as RNAseq or DNA copy number)
                               fluidRow(
                                 column(2,
                                        "Data"),
+                                #input to select which data type is displayed on the x-axis
                                 column(5,
-                                       selectInput("variable", NULL,
-                                                   c("Data1" = "cyl",
-                                                     "Data2" = "am",
-                                                     "Data3" = "gear"))
+                                       selectInput("datatype_x", NULL,
+                                                   c("Data1" = "data1",
+                                                     "Data2" = "data2",
+                                                     "Data3" = "data3"))
                                        ),
+                                #input to select which data type is displayed on the y-axis
                                 column(5,
-                                       selectInput("variable", NULL,
-                                                   c("Data1" = "cyl",
-                                                     "Data2" = "am",
-                                                     "Data3" = "gear")))
+                                       selectInput("datatype_y", NULL,
+                                                   c("Data1" = "data1",
+                                                     "Data2" = "data2",
+                                                     "Data3" = "data3")))
                                 ),
+                              #row to select which gene to view
                               fluidRow(
                                 column(2,"Gene"),
+                                #input to select which gene is displayed on the x-axis
                                 column(5,
-                                       selectInput("variable", NULL,
-                                                   c("Gene1" = "cyl",
-                                                     "Gene2" = "am",
-                                                     "Gene3" = "gear"))
+                                       selectInput("gene_x", NULL,
+                                                   c("Gene1" = "gene1",
+                                                     "Gene2" = "gene2",
+                                                     "Gene3" = "gene3"))
                                        ),
+                                #input to select which gene is displayed on the y-axis
                                 column(5,
-                                       selectInput("variable", NULL,
-                                                   c("Gene1" = "cyl",
-                                                     "Gene2" = "am",
-                                                     "Gene3" = "gear")))
+                                       selectInput("gene_y", NULL,
+                                                   c("Gene1" = "gene1",
+                                                     "Gene2" = "gene2",
+                                                     "Gene3" = "gene3")))
                                 )
                               ),
                             br(),
                             "Select a cancer type to highlight",
                             selectInput("variable", NULL,
-                                        c("Cancer1" = "cyl",
-                                          "Cancer2" = "am",
-                                          "Cancer3" = "gear")),
-                            checkboxInput("somevalue", "Show selected cancers only?", FALSE)
+                                        c("Cancer1" = "cancer1",
+                                          "Cancer2" = "cancer2",
+                                          "Cancer3" = "cancer3")),
+                            checkboxInput("showSelected", "Show selected cancers only?", FALSE)
                             ),
+                     #main column to display scatterplot and details for a selected point on the scatterplot)
                      column(9,
+                            #row to display details of a user-selected point
                             fluidRow(
+                              #display details from a point on the left plot ("zoomed-out" plot)
                               column(6, 
-                                     wellPanel("Details1")),
+                                     fluidRow(column(1),
+                                              column(10,
+                                                     wellPanel("Details 1a (cell line, cancer type)"))),
+                                     fluidRow(column(1),
+                                              column(10,
+                                                     wellPanel("Details 1b (rnaseq info, dna copy, etc)")))
+                              ), 
+                              #display details from a point on the right plot ("zoomed-in" plot)
                               column(6,
-                                     wellPanel("Details2"))
+                                     fluidRow(column(1),
+                                              column(10,
+                                                     wellPanel("Details 1a (cell line, cancer type)"))),
+                                     fluidRow(column(1),
+                                              column(10,
+                                                     wellPanel("Details 1b (rnaseq info, dna copy, etc)")))
+                                     )
                               ),
+                            #display plots
                             fluidRow(
+                              #left plot ("zoomed-out" plot)
                               column(6,
                                      wellPanel(plotOutput("plot")),
                                      "plot1"),
+                              #right plot ("zoomed-in" plot)
                               column(6,
-                                     wellPanel(plotOutput("plot")),
-                                     "plot2")
-                              ),
-                            "hi"
+                                     conditionalPanel( condition = "input.showSelected==FALSE",
+                                                       wellPanel(plotOutput("plot_zoom")),
+                                                       "plot2")
+                                     )
+                              )
                             )
                      )
                    ),
@@ -91,8 +122,11 @@ ui <-
     )
   )
 server <- function(input, output) { 
-  output$hist<- renderPlot({ 
-    hist(rnorm(input$n)) 
+  output$plot<- renderPlot({ 
+    plot(rnorm(100)) 
+  }) 
+  output$plot_zoom<- renderPlot({ 
+    plot(rnorm(100)) 
   }) 
 }
 shinyApp(ui = ui, server = server)

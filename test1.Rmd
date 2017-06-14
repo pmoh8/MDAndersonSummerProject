@@ -40,9 +40,7 @@ ui <-
                                 #input to select which data type is displayed on the x-axis
                                 column(5,
                                        selectInput("datatype_x", NULL,
-                                                   c("Data1" = "data1",
-                                                     "Data2" = "data2",
-                                                     "Data3" = "data3"))
+                                                   c("mRNA Expression"))
                                        ),
                                 #input to select which data type is displayed on the y-axis
                                 column(5,
@@ -192,14 +190,15 @@ source("common2.R")
 stuff <- read.gct("Achilles_v3.3.8_rawreadcounts.gct")$data
 stuff <- read.table("CCLE_copynumber_byGene_2013-12-03.txt",sep ="\t",header=T)
 print(stuff)
-annotation <- read.table("CCLE_sample_info_file_2012-10-18.txt",sep ="\t",header=T)
 
-list <- annotation[,c("CCLE.name","Site.Primary")]
-list <- split(list[,"CCLE.name"],list[,"Site.Primary"])
-print(list)
-stuff1 <- do.call(cbind, lapply(list, function(x){
-   rowMeans(stuff[,as.character(x)])
- }))
+# annotation <- read.table("CCLE_sample_info_file_2012-10-18.txt",sep ="\t",header=T)
+# 
+# list <- annotation[,c("CCLE.name","Site.Primary")]
+# list <- split(list[,"CCLE.name"],list[,"Site.Primary"])
+# print(list)
+# stuff1 <- do.call(cbind, lapply(list, function(x){
+#    rowMeans(stuff[,as.character(x)])
+#  }))
 
 # 
 # 

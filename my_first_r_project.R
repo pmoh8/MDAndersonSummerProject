@@ -88,9 +88,22 @@ ui <-
                      column(9,
                             fluidRow(
                               column(6, 
-                                     wellPanel("Details1")),
+                                     fluidRow(column(1),
+                                              column(10,
+                                                     wellPanel("Details 1a (cell line, cancer type)"))),
+                                     fluidRow(column(1),
+                                              column(10,
+                                                     wellPanel("Details 1b (rnaseq info, dna copy, etc)")))
+                              ), 
                               column(6,
-                                     wellPanel("Details2"))
+                                     fluidRow(column(1),
+                                              column(10,
+                                                     wellPanel("Details 1a (cell line, cancer type)"))),
+                                     fluidRow(column(1),
+                                              column(10,
+                                                     wellPanel("Details 1b (rnaseq info, dna copy, etc)")))
+                                     
+                                     )
                               ),
                             fluidRow(
                               column(6,

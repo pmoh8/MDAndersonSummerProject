@@ -10,6 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r, echo = F}
 library(shiny)
+library(ggplot2)
 #User Interface
 ui <- 
   fluidPage( 
@@ -87,7 +88,11 @@ ui <-
                                                      wellPanel("Details 1a (cell line, cancer type)"))),
                                      fluidRow(column(1),
                                               column(10,
-                                                     wellPanel("Details 1b (rnaseq info, dna copy, etc)")))
+                                                     wellPanel("Details 1b (rnaseq info, dna copy, etc)",
+                                                               verbatimTextOutput("click_info")
+                                                               )
+                                                     )
+                                              )
                               ), 
                               #display details from a point on the right plot ("zoomed-in" plot)
                               column(6,
@@ -103,7 +108,12 @@ ui <-
                             fluidRow(
                               #left plot ("zoomed-out" plot)
                               column(6,
-                                     wellPanel(plotOutput("plot")),
+                                     wellPanel(
+                                       plotOutput("plot",
+                                                  click = "plot_click",
+                                                  brush = brushOpts(id="plot_brush")
+                                                  )
+                                       ),
                                      "plot1"),
                               #right plot ("zoomed-in" plot)
                               column(6,
@@ -115,16 +125,21 @@ ui <-
                             )
                      )
                    ),
-                   
           tabPanel("Heatmap", verbatimTextOutput("summary"))
         )
       )
     )
   )
 server <- function(input, output) { 
+  x <- rnorm(1000)
+  y <- rnorm(1000)
+  testdata <- data.frame(x = x, y = y)
   output$plot<- renderPlot({ 
-    plot(rnorm(100)) 
+    qplot(testdata$x,testdata$y, alpha = .50, color = "blue") 
   }) 
+  output$click_info <- renderPrint({
+    nearPoints(testdata, input$plot_click, addDist = TRUE)
+  })
   output$plot_zoom<- renderPlot({ 
     plot(rnorm(100)) 
   }) 
@@ -132,8 +147,6 @@ server <- function(input, output) {
 shinyApp(ui = ui, server = server)
 ```
 ```{r, eval=F, echo = F}
-
-
 source("common2.R")
 stuff <- read.gct("Achilles_v3.3.8_rawreadcounts.gct")$data
 stuff <- read.table("CCLE_copynumber_byGene_2013-12-03.txt",sep ="\t",header=T)

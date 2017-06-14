@@ -23,7 +23,6 @@ ui <-
           #BEGIN SCATTERPLOT TAB
           tabPanel("Scatterplot", 
                    br(),
-                   textOutput("brushActive"),
                    fluidRow(
                      #Column for user controls (selecting which pieces of data to view and highlight)
                      column(3,
@@ -143,16 +142,10 @@ ui <-
     )
   )
 server <- function(input, output) {
-#BEGIN TEST VALUES
-  x <- rnorm(500)
-  y <- rnorm(500)
-  testdata <- data.frame(x = x, y = y)
-  zoomdata
-#END TEST VALUES
-  
   #values for event flags
-  flags <- reactiveValues(brushActive <- 1)
-  output$brushActive <- reactive(return{flags$brushActive}) 
+  flags <- reactiveValues(brushActive = 1)
+  output$brushActive <- renderText(1) #reactive({ return(flags$brushActive) })
+  outputOptions(output, name = "brushActive", suspendWhenHidden = FALSE)
   #check flags and whatnot
   observeEvent(zoomdata, {
    if(!(is.null(zoomdata))) {
@@ -160,9 +153,17 @@ server <- function(input, output) {
    }
   })
   
-  # observeEvent(input$plot_click,{
-  #   flags$brushActive <- 0
-  # })      
+  observeEvent(input$plot_click,{
+    zoomdata <- NULL
+    flags$brushActive <- 0
+  })      
+  
+#BEGIN TEST VALUES
+  x <- rnorm(500)
+  y <- rnorm(500)
+  testdata <- data.frame(x = x, y = y)
+  zoomdata
+#END TEST VALUES
   
   #output the left/"zoomed-out" plot
   output$plot<- renderPlot({ 
@@ -176,7 +177,6 @@ server <- function(input, output) {
   #output the right/"zoomed-out" plot
   output$plot_zoom<- renderPlot({ 
     zoomdata <- brushedPoints(testdata,input$plot_brush)
-    flags$brushActive <- 1 
     ggplot(zoomdata, aes(x,y, alpha=.5, color="blue")) + geom_point(aes(alpha=.5, color="blue"))
   }) 
   #output data associated with the selected point on the right/"zoomed-in" plot

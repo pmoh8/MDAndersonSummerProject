@@ -161,14 +161,17 @@ server <- function(input, output) {
   x <- rnorm(500)
   y <- rnorm(500)
   testdata <- data.frame(x = x, y = y)
-  zoomdata
 #END TEST VALUES
+#BEGIN TEST VALUES 2
+  testdata_mRNAexpr <- read.gct("Achilles_v3.3.8_rawreadcounts.gct")$data
+#END TEST VALUES 2
   
   #output the left/"zoomed-out" plot
   output$plot<- renderPlot({ 
     ggplot(testdata, aes(x,y, alpha=.5, color="blue")) + geom_point(aes(alpha=.5, color="blue"))
     #qplot(testdata$x,testdata$y, alpha = .50, color = "blue") 
   }) 
+  
   #output data associated with the selected point on the left/"zoomed-out" plot
   output$click_info <- renderPrint({
     nearPoints(testdata, input$plot_click, maxpoints = 1)
@@ -189,34 +192,49 @@ shinyApp(ui = ui, server = server)
 ```
 ```{r, eval = F}
 source("common2.R")
-stuff <- read.gct("Achilles_v3.3.8_rawreadcounts.gct")$data
-stuff <- read.table("CCLE_copynumber_byGene_2013-12-03.txt",sep ="\t",header=T)
-print(stuff)
+library(ggplot2)
+testdata_Achilles <- read.gct("CCLE_Expression_Entrez_2012-09-29.gct")$data
+#print(head(testdata_Achilles, 10))
+print(colnames(testdata_Achilles))
+x_sel <- "100009676" #"A375_SKIN"
+y_sel <- "10000" #"A673_BONE"
+x <- testdata_Achilles[grep(x_sel, rownames(testdata_Achilles)),][1,]
+y <- testdata_Achilles[grep(y_sel, rownames(testdata_Achilles)),][1,]
+print(x)
+print(y)
+plotdata= data.frame(x = x, y = y)
+p<-ggplot(plotdata, aes(x,y)) + geom_point(alpha=.3, color="blue") + labs(x = x_sel, y = y_sel, title = "Test Scatter")
+p
 
-# annotation <- read.table("CCLE_sample_info_file_2012-10-18.txt",sep ="\t",header=T)
+
+#print(testdata_Achilles[,"A375_SKIN"])
+#print(testdata_Achilles[,"A673_BONE"])
+# stuff <- read.gct("Achilles_v3.3.8_rawreadcounts.gct")$data
+# stuff <- read.table("CCLE_copynumber_byGene_2013-12-03.txt",sep ="\t",header=T)
+# #print(stuff)
 # 
-# list <- annotation[,c("CCLE.name","Site.Primary")]
+#  annotation <- read.table("CCLE_sample_info_file_2012-10-18.txt",sep ="\t",header=T)
+# 
+#  list <- annotation[,c("CCLE.name","Site.Primary")]
 # list <- split(list[,"CCLE.name"],list[,"Site.Primary"])
-# print(list)
-# stuff1 <- do.call(cbind, lapply(list, function(x){
-#    rowMeans(stuff[,as.character(x)])
-#  }))
-
+#  #print(list)
+#  stuff1 <- do.call(cbind, lapply(list, function(x){
+#     rowMeans(stuff[,as.character(x)])
+#   }))
 # 
+#  underscore <- regexpr("_",colnames(stuff))
+#  cell_lines <- substring(colnames(stuff), 1, underscore-1)
+#  cancer_type <- substring(colnames(stuff), underscore+1)
+#  skin <- stuff[,grep("EGID|SYMBOL|CHR|CHRLOC|CHRLOCEND|SKIN", colnames(stuff))]
 # 
-# underscore <- regexpr("_",colnames(stuff))
-# cell_lines <- substring(colnames(stuff), 1, underscore-1)
-# cancer_type <- substring(colnames(stuff), underscore+1)
-# skin <- stuff[,grep("EGID|SYMBOL|CHR|CHRLOC|CHRLOCEND|SKIN", colnames(stuff))]
+#  for(i in cell_lines){
+#    columns <- grep(i, colnames(stuff))
 # 
-# for(i in cell_lines){
-#   columns <- grep(i, colnames(stuff))
-#   
 # }
 # 
 # 
 # table(list$Site.Primary)
-
-#correlations <- cor(stuff[,6:30])
-#heatmap(correlations,margins=c(10,10))
+# 
+# correlations <- cor(stuff[,6:30])
+# heatmap(correlations)
 ```

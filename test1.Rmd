@@ -141,19 +141,20 @@ ui <-
   )
 server <- function(input, output) {
   #values for event flags
-  flags <- reactiveValues(brushActive = 1)
-  output$brushActive <- renderText(1) #reactive({ return(flags$brushActive) })
+  flags <- reactiveValues(brushActive = 0)
+  output$brushActive <- reactive({ return(flags$brushActive) })
+  
   outputOptions(output, name = "brushActive", suspendWhenHidden = FALSE)
   #check flags and whatnot
-  observeEvent(zoomdata, {
-   if(!(is.null(zoomdata))) {
-     flags$brushActive <- 1 
-   }
-  })
-  
+  # observeEvent(zoomdata, {
+  #  if(!(is.null(zoomdata))) {
+  #    flags$brushActive <- 1 
+  #  }
+  # })
+  # 
   observeEvent(input$plot_click,{
     zoomdata <- NULL
-    flags$brushActive <- 0
+    flags$brushActive <- 1
   })      
   
 #BEGIN TEST VALUES
@@ -175,6 +176,7 @@ server <- function(input, output) {
   #output the right/"zoomed-out" plot
   output$plot_zoom<- renderPlot({ 
     zoomdata <- brushedPoints(testdata,input$plot_brush)
+    flags$brushActive <- 1 
     ggplot(zoomdata, aes(x,y, alpha=.5, color="blue")) + geom_point(aes(alpha=.5, color="blue"))
   }) 
   #output data associated with the selected point on the right/"zoomed-in" plot

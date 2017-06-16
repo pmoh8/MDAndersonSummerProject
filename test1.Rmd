@@ -8,9 +8,10 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r, eval = T, echo = F}
+```{r, eval = F, echo = F}
 library(shiny)
 library(ggplot2)
+source("common2.R")
 #User Interface
 ui <- 
   fluidPage( 
@@ -55,7 +56,10 @@ ui <-
                                 #input to select which gene is displayed on the x-axis
                                 column(5,
                                        selectInput("gene_x", NULL,
-                                                   c("A375-311" = "gene1",
+                                                   c("---" = " ",
+                                                     "A1BG" = "A1BG",
+                                                     "CDH2" = "CDH2",
+                                                     "A375-311" = "gene1",
                                                      "A-673-311" = "gene2",
                                                      "BxPC3-311" = "gene3",
                                                      "CADO-ES-1-311" = "gene4",
@@ -87,12 +91,16 @@ ui <-
                                                      "T-47D-311" = "gene30",
                                                      "TC32-311" = "gene31",
                                                      "TC-71-311" = "gene32",
-                                                     "TOV112D-311" = "gene33"))
+                                                     "TOV112D-311" = "gene33"
+                                                     ))
                                        ),
                                 #input to select which gene is displayed on the y-axis
                                 column(5,
                                        selectInput("gene_y", NULL,
-                                                   c("Gene1" = "gene1",
+                                                   c("---" = " ",
+                                                     "A1BG" = "A1BG",
+                                                     "CDH2" = "CDH2",
+                                                     "Gene1" = "gene1",
                                                      "Gene2" = "gene2",
                                                      "Gene3" = "gene3")))
                                 )
@@ -183,6 +191,8 @@ server <- function(input, output) {
   testdata <- data.frame(x = x, y = y)
   plotdata <- reactiveValues(zoomdata=testdata)
 #END TEST VALUES
+testdata_txt <- read.table("CCLE_copynumber_byGene_2013-12-03.txt",sep ="\t",header=T)
+    
   #check flags and whatnot
   observeEvent(plotdata$zoomdata, {
    if(is.data.frame(plotdata$zoomdata) && nrow(plotdata$zoomdata)==0) {
@@ -198,7 +208,19 @@ server <- function(input, output) {
 
   #output the left/"zoomed-out" plot
   output$plot<- renderPlot({ 
-    ggplot(testdata, aes(x,y)) + geom_point(aes(alpha=.5, color="blue"))
+    x_sel <- input$gene_x
+    y_sel <- input$gene_y
+    #Select the appropriate rows from our database table based on user input
+    if(x_sel != " " && y_sel != " "){
+      x <- sapply(testdata_txt[testdata_txt[,"SYMBOL"]==x_sel,-c(1:5)], as.numeric)
+      y <- sapply(testdata_txt[testdata_txt[,"SYMBOL"]==y_sel,-c(1:5)], as.numeric)
+      
+      plotdata= data.frame(x = x, y = y)
+      p<-ggplot(plotdata, aes(x,y)) + geom_point(alpha=.3, color="blue") + labs(x = x_sel, y = y_sel, title = "Test Scatter")
+      p
+    }
+    
+    #ggplot(testdata, aes(x,y)) + geom_point(alpha=.5, color="blue")
     #qplot(testdata$x,testdata$y, alpha = .50, color = "blue") 
   }) 
   #output data associated with the selected point on the left/"zoomed-out" plot
@@ -209,7 +231,7 @@ server <- function(input, output) {
   output$plot_zoom<- renderPlot({ 
     print("zoom")
     plotdata$zoomdata <- brushedPoints(testdata,input$plot_brush)
-    ggplot(plotdata$zoomdata, aes(x,y)) + geom_point(aes(alpha=.5, color="blue"))
+    ggplot(plotdata$zoomdata, aes(x,y)) + geom_point(alpha=.5, color="blue")
   }) 
   #output data associated with the selected point on the right/"zoomed-in" plot
   output$zoom_click_info <- renderPrint({
@@ -268,7 +290,7 @@ p
 # correlations <- cor(stuff[,6:30])
 # heatmap(correlations)
 ```
-```{r, eval = F}
+```{r, eval = T}
 ##TESTING SPACE FOR READING A TXT AND DISPLAYING THE DATA
 source("common2.R")
 library(ggplot2)

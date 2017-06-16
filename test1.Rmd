@@ -55,9 +55,39 @@ ui <-
                                 #input to select which gene is displayed on the x-axis
                                 column(5,
                                        selectInput("gene_x", NULL,
-                                                   c("Gene1" = "gene1",
-                                                     "Gene2" = "gene2",
-                                                     "Gene3" = "gene3"))
+                                                   c("A375-311" = "gene1",
+                                                     "A-673-311" = "gene2",
+                                                     "BxPC3-311" = "gene3",
+                                                     "CADO-ES-1-311" = "gene4",
+                                                     "CAL-120-311" = "gene5",
+                                                     "COLO-741-311" = "gene6",
+                                                     "COR-L105-311" = "gene7",
+                                                     "EW8-311" = "gene8",
+                                                     "EWS502-311" = "gene9",
+                                                     "G-402-311" = "gene10",
+                                                     "HCC44-311" = "gene11",
+                                                     "Hs294T-311" = "gene12",
+                                                     "HT-29-311" = "gene13",
+                                                     "K562-311" = "gene14",
+                                                     "L3.3-311" = "gene15",
+                                                     "LNCaP Clone FGC-311" = "gene16",
+                                                     "MeWo-311" = "gene17",
+                                                     "MHH-ES-1-311" = "gene18",
+                                                     "NCI-H1373-311" = "gene19",
+                                                     "NCI-H2009-311" = "gene20",
+                                                     "Panc.03.27-311" = "gene21",
+                                                     "Panc 08.13-311" = "gene22",
+                                                     "Panc1-311" = "gene23",
+                                                     "PA-TU-8902-311" = "gene24",
+                                                     "PA-TU-8988T-311" = "gene25",
+                                                     "PC-3-311" = "gene26",
+                                                     "RD-ES-311" = "gene27",
+                                                     "SK-ES-1-311" = "gene28",
+                                                     "SU.86.86-311" = "gene29",
+                                                     "T-47D-311" = "gene30",
+                                                     "TC32-311" = "gene31",
+                                                     "TC-71-311" = "gene32",
+                                                     "TOV112D-311" = "gene33"))
                                        ),
                                 #input to select which gene is displayed on the y-axis
                                 column(5,
@@ -161,17 +191,14 @@ server <- function(input, output) {
   x <- rnorm(500)
   y <- rnorm(500)
   testdata <- data.frame(x = x, y = y)
+
 #END TEST VALUES
-#BEGIN TEST VALUES 2
-  testdata_mRNAexpr <- read.gct("Achilles_v3.3.8_rawreadcounts.gct")$data
-#END TEST VALUES 2
   
   #output the left/"zoomed-out" plot
   output$plot<- renderPlot({ 
     ggplot(testdata, aes(x,y, alpha=.5, color="blue")) + geom_point(aes(alpha=.5, color="blue"))
     #qplot(testdata$x,testdata$y, alpha = .50, color = "blue") 
   }) 
-  
   #output data associated with the selected point on the left/"zoomed-out" plot
   output$click_info <- renderPrint({
     nearPoints(testdata, input$plot_click, maxpoints = 1)
@@ -191,68 +218,35 @@ server <- function(input, output) {
 shinyApp(ui = ui, server = server)
 ```
 ```{r, eval = F}
-##TESTING SPACE FOR READING A GCT AND DISPLAYING DATA
 source("common2.R")
-library(ggplot2)
-testdata_Achilles <- read.gct("CCLE_Expression_Entrez_2012-09-29.gct")$data
-#print(head(testdata_Achilles, 10))
-print(colnames(testdata_Achilles))
-x_sel <- "100009676" #"A375_SKIN"
-y_sel <- "10000" #"A673_BONE"
-x <- testdata_Achilles[grep(x_sel, rownames(testdata_Achilles)),][1,]
-y <- testdata_Achilles[grep(y_sel, rownames(testdata_Achilles)),][1,]
-print(x)
-print(y)
-plotdata= data.frame(x = x, y = y)
-p<-ggplot(plotdata, aes(x,y)) + geom_point(alpha=.3, color="blue") + labs(x = x_sel, y = y_sel, title = "Test Scatter")
-p
+stuff <- read.gct("Achilles_v3.3.8_rawreadcounts.gct")$data
+stuff <- read.table("CCLE_copynumber_byGene_2013-12-03.txt",sep ="\t",header=T)
+print(stuff)
 
-
-#print(testdata_Achilles[,"A375_SKIN"])
-#print(testdata_Achilles[,"A673_BONE"])
-# stuff <- read.gct("Achilles_v3.3.8_rawreadcounts.gct")$data
-# stuff <- read.table("CCLE_copynumber_byGene_2013-12-03.txt",sep ="\t",header=T)
-# #print(stuff)
+# annotation <- read.table("CCLE_sample_info_file_2012-10-18.txt",sep ="\t",header=T)
 # 
-#  annotation <- read.table("CCLE_sample_info_file_2012-10-18.txt",sep ="\t",header=T)
-# 
-#  list <- annotation[,c("CCLE.name","Site.Primary")]
+# list <- annotation[,c("CCLE.name","Site.Primary")]
 # list <- split(list[,"CCLE.name"],list[,"Site.Primary"])
-#  #print(list)
-#  stuff1 <- do.call(cbind, lapply(list, function(x){
-#     rowMeans(stuff[,as.character(x)])
-#   }))
+# print(list)
+# stuff1 <- do.call(cbind, lapply(list, function(x){
+#    rowMeans(stuff[,as.character(x)])
+#  }))
+
 # 
-#  underscore <- regexpr("_",colnames(stuff))
-#  cell_lines <- substring(colnames(stuff), 1, underscore-1)
-#  cancer_type <- substring(colnames(stuff), underscore+1)
-#  skin <- stuff[,grep("EGID|SYMBOL|CHR|CHRLOC|CHRLOCEND|SKIN", colnames(stuff))]
 # 
-#  for(i in cell_lines){
-#    columns <- grep(i, colnames(stuff))
+# underscore <- regexpr("_",colnames(stuff))
+# cell_lines <- substring(colnames(stuff), 1, underscore-1)
+# cancer_type <- substring(colnames(stuff), underscore+1)
+# skin <- stuff[,grep("EGID|SYMBOL|CHR|CHRLOC|CHRLOCEND|SKIN", colnames(stuff))]
 # 
+# for(i in cell_lines){
+#   columns <- grep(i, colnames(stuff))
+#   
 # }
 # 
 # 
 # table(list$Site.Primary)
-# 
-# correlations <- cor(stuff[,6:30])
-# heatmap(correlations)
-```
-```{r, eval = F}
-##TESTING SPACE FOR READING A TXT AND DISPLAYING THE DATA
-source("common2.R")
-library(ggplot2)
-testdata_txt <- read.table("CCLE_copynumber_byGene_2013-12-03.txt",sep ="\t",header=T)
-# print(colnames(testdata_txt))
-print(testdata_txt)
-# x_sel <- "100009676" #"A375_SKIN"
-# y_sel <- "10000" #"A673_BONE"
-# x <- testdata_Achilles[grep(x_sel, rownames(testdata_Achilles)),][1,]
-# y <- testdata_Achilles[grep(y_sel, rownames(testdata_Achilles)),][1,]
-# print(x)
-# print(y)
-# plotdata= data.frame(x = x, y = y)
-# p<-ggplot(plotdata, aes(x,y)) + geom_point(alpha=.3, color="blue") + labs(x = x_sel, y = y_sel, title = "Test Scatter")
-# p
+
+#correlations <- cor(stuff[,6:30])
+#heatmap(correlations,margins=c(10,10))
 ```

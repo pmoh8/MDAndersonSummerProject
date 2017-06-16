@@ -175,28 +175,30 @@ server <- function(input, output) {
   output$brushActive <- reactive({ return(flags$brushActive) })
   
   outputOptions(output, name = "brushActive", suspendWhenHidden = FALSE)
-  #check flags and whatnot
-  # observeEvent(zoomdata, {
-  #  if(!(is.null(zoomdata))) {
-  #    flags$brushActive <- 1 
-  #  }
-  # })
-  # 
-  observeEvent(input$plot_click,{
-    zoomdata <- NULL
-    flags$brushActive <- 1
-  })      
+    
   
 #BEGIN TEST VALUES
   x <- rnorm(500)
   y <- rnorm(500)
   testdata <- data.frame(x = x, y = y)
-
+  plotdata <- reactiveValues(zoomdata=testdata)
 #END TEST VALUES
-  
+  #check flags and whatnot
+  observeEvent(plotdata$zoomdata, {
+   if(is.data.frame(plotdata$zoomdata) && nrow(plotdata$zoomdata)==0) {
+      flags$brushActive <- 0
+      print("brush is not active")
+   }
+    else{
+      flags$brushActive <- 1
+      print("brush is active!")
+    }
+  })
+  observeEvent(input$plot_brush,{plotdata$zoomdata <- brushedPoints(testdata,input$plot_brush)})
+
   #output the left/"zoomed-out" plot
   output$plot<- renderPlot({ 
-    ggplot(testdata, aes(x,y, alpha=.5, color="blue")) + geom_point(aes(alpha=.5, color="blue"))
+    ggplot(testdata, aes(x,y)) + geom_point(aes(alpha=.5, color="blue"))
     #qplot(testdata$x,testdata$y, alpha = .50, color = "blue") 
   }) 
   #output data associated with the selected point on the left/"zoomed-out" plot
@@ -205,9 +207,9 @@ server <- function(input, output) {
   })
   #output the right/"zoomed-out" plot
   output$plot_zoom<- renderPlot({ 
-    zoomdata <- brushedPoints(testdata,input$plot_brush)
-    flags$brushActive <- 1 
-    ggplot(zoomdata, aes(x,y, alpha=.5, color="blue")) + geom_point(aes(alpha=.5, color="blue"))
+    print("zoom")
+    plotdata$zoomdata <- brushedPoints(testdata,input$plot_brush)
+    ggplot(plotdata$zoomdata, aes(x,y)) + geom_point(aes(alpha=.5, color="blue"))
   }) 
   #output data associated with the selected point on the right/"zoomed-in" plot
   output$zoom_click_info <- renderPrint({
@@ -218,35 +220,69 @@ server <- function(input, output) {
 shinyApp(ui = ui, server = server)
 ```
 ```{r, eval = F}
+##TESTING SPACE FOR READING A GCT AND DISPLAYING DATA
 source("common2.R")
-stuff <- read.gct("Achilles_v3.3.8_rawreadcounts.gct")$data
-stuff <- read.table("CCLE_copynumber_byGene_2013-12-03.txt",sep ="\t",header=T)
-print(stuff)
+library(ggplot2)
+testdata_Achilles <- read.gct("Achilles_v3.3.8.gct")$data
+#print(head(testdata_Achilles, 10))
+print(colnames(testdata_Achilles))
+x_sel <- "MIR3129" #"A375_SKIN"
+y_sel <- "SESTD1" #"A673_BONE"
+x <- testdata_Achilles[grep(x_sel, rownames(testdata_Achilles)),][1,]
+y <- testdata_Achilles[grep(y_sel, rownames(testdata_Achilles)),][1,]
+print(x)
+print(y)
+plotdata= data.frame(x = x, y = y)
+p<-ggplot(plotdata, aes(x,y)) + geom_point(alpha=.3, color="blue") + labs(x = x_sel, y = y_sel, title = "Test Scatter")
+p
 
-# annotation <- read.table("CCLE_sample_info_file_2012-10-18.txt",sep ="\t",header=T)
+
+#print(testdata_Achilles[,"A375_SKIN"])
+#print(testdata_Achilles[,"A673_BONE"])
+# stuff <- read.gct("Achilles_v3.3.8_rawreadcounts.gct")$data
+# stuff <- read.table("CCLE_copynumber_byGene_2013-12-03.txt",sep ="\t",header=T)
+# #print(stuff)
 # 
-# list <- annotation[,c("CCLE.name","Site.Primary")]
+#  annotation <- read.table("CCLE_sample_info_file_2012-10-18.txt",sep ="\t",header=T)
+# 
+#  list <- annotation[,c("CCLE.name","Site.Primary")]
 # list <- split(list[,"CCLE.name"],list[,"Site.Primary"])
-# print(list)
-# stuff1 <- do.call(cbind, lapply(list, function(x){
-#    rowMeans(stuff[,as.character(x)])
-#  }))
-
+#  #print(list)
+#  stuff1 <- do.call(cbind, lapply(list, function(x){
+#     rowMeans(stuff[,as.character(x)])
+#   }))
 # 
+#  underscore <- regexpr("_",colnames(stuff))
+#  cell_lines <- substring(colnames(stuff), 1, underscore-1)
+#  cancer_type <- substring(colnames(stuff), underscore+1)
+#  skin <- stuff[,grep("EGID|SYMBOL|CHR|CHRLOC|CHRLOCEND|SKIN", colnames(stuff))]
 # 
-# underscore <- regexpr("_",colnames(stuff))
-# cell_lines <- substring(colnames(stuff), 1, underscore-1)
-# cancer_type <- substring(colnames(stuff), underscore+1)
-# skin <- stuff[,grep("EGID|SYMBOL|CHR|CHRLOC|CHRLOCEND|SKIN", colnames(stuff))]
+#  for(i in cell_lines){
+#    columns <- grep(i, colnames(stuff))
 # 
-# for(i in cell_lines){
-#   columns <- grep(i, colnames(stuff))
-#   
 # }
 # 
 # 
 # table(list$Site.Primary)
+# 
+# correlations <- cor(stuff[,6:30])
+# heatmap(correlations)
+```
+```{r, eval = F}
+##TESTING SPACE FOR READING A TXT AND DISPLAYING THE DATA
+source("common2.R")
+library(ggplot2)
+testdata_txt <- read.table("CCLE_copynumber_byGene_2013-12-03.txt",sep ="\t",header=T)
+x_sel <- "A1BG"
+y_sel <- "CDH2"
+print(head(testdata_txt))
+#Select the appropriate rows from our database table based on user input
+x <- sapply(testdata_txt[testdata_txt[,"SYMBOL"]==x_sel,-c(1:5)], as.numeric)
+y <- sapply(testdata_txt[testdata_txt[,"SYMBOL"]==y_sel,-c(1:5)], as.numeric)
 
-#correlations <- cor(stuff[,6:30])
-#heatmap(correlations,margins=c(10,10))
+plotdata= data.frame(x = x, y = y)
+p<-ggplot(plotdata, aes(x,y)) + geom_point(alpha=.3, color="blue") + labs(x = x_sel, y = y_sel, title = "Test Scatter")
+p
+
+
 ```

@@ -54,11 +54,44 @@ ui <-
                                 #input to select which gene is displayed on the x-axis
                                 column(5,
                                        selectInput("gene_x", NULL,
-                                                   c("A1BG" = "A1BG",
-                                                     "---" = " ",
-                                                     
-                                                     "CDH2" = "CDH2"
+                                                   c("---" = " ",
+                                                     "A1BG" = "A1BG",
+                                                     "CDH2" = "CDH2",
+                                                     "A375-311" = "gene1",
+                                                     "A-673-311" = "gene2",
+                                                     "BxPC3-311" = "gene3",
+                                                     "CADO-ES-1-311" = "gene4",
+                                                     "CAL-120-311" = "gene5",
+                                                     "COLO-741-311" = "gene6",
+                                                     "COR-L105-311" = "gene7",
+                                                     "EW8-311" = "gene8",
+                                                     "EWS502-311" = "gene9",
+                                                     "G-402-311" = "gene10",
+                                                     "HCC44-311" = "gene11",
+                                                     "Hs294T-311" = "gene12",
+                                                     "HT-29-311" = "gene13",
+                                                     "K562-311" = "gene14",
+                                                     "L3.3-311" = "gene15",
+                                                     "LNCaP Clone FGC-311" = "gene16",
+                                                     "MeWo-311" = "gene17",
+                                                     "MHH-ES-1-311" = "gene18",
+                                                     "NCI-H1373-311" = "gene19",
+                                                     "NCI-H2009-311" = "gene20",
+                                                     "Panc.03.27-311" = "gene21",
+                                                     "Panc 08.13-311" = "gene22",
+                                                     "Panc1-311" = "gene23",
+                                                     "PA-TU-8902-311" = "gene24",
+                                                     "PA-TU-8988T-311" = "gene25",
+                                                     "PC-3-311" = "gene26",
+                                                     "RD-ES-311" = "gene27",
+                                                     "SK-ES-1-311" = "gene28",
+                                                     "SU.86.86-311" = "gene29",
+                                                     "T-47D-311" = "gene30",
+                                                     "TC32-311" = "gene31",
+                                                     "TC-71-311" = "gene32",
+                                                     "TOV112D-311" = "gene33"
                                                      ))
+
                                        ),
                                 #input to select which gene is displayed on the y-axis
                                 column(5,
@@ -216,13 +249,10 @@ server <- function(input, output) {
     }) 
     #output data associated with the selected point on the left/"zoomed-out" plot
     output$click_info <- renderPrint({
-      if(is.null(input$plot_click)){
-        printPoint(pnt)
-      }
-      else{
+      if(!is.null(input$plot_click)){
         pnt <- nearPoints(defaultplotdata, input$plot_click, maxpoints = 1)
-        printPoint(pnt)
       }
+      printPoint(pnt)
       
     })
     #output the right/"zoomed-out" plot

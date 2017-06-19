@@ -59,14 +59,6 @@ ui <-
                                                      
                                                      "CDH2" = "CDH2"
                                                      ))
-<<<<<<< HEAD
-<<<<<<< HEAD
-
->>>>>>> 4ef257d6265b151ed739a2befec6bb84a8e1776a
-=======
->>>>>>> 2c32fc4d29b0ff2e3d0c1a9c6feea73288e7cbe5
-=======
->>>>>>> 2c32fc4d29b0ff2e3d0c1a9c6feea73288e7cbe5
                                        ),
                                 #input to select which gene is displayed on the y-axis
                                 column(5,
@@ -175,15 +167,8 @@ server <- function(input, output) {
     
     inputdata_x <- readRDS("CCLE_copynumber_byGene_2013-12-03")
     inputdata_y <- inputdata_x 
-    defaultplotdata <- inputdata_x
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
     pnt <- NULL
->>>>>>> 2c32fc4d29b0ff2e3d0c1a9c6feea73288e7cbe5
-=======
-    pnt <- NULL
->>>>>>> 2c32fc4d29b0ff2e3d0c1a9c6feea73288e7cbe5
+
   ###################################
   ######## CHECK EVENT FLAGS ########
   ###################################
@@ -222,64 +207,29 @@ server <- function(input, output) {
         defaultplot <<- ggplot() + geom_point(data = defaultplotdata, aes(x,y), alpha=.3, color="blue") + labs(x = x_sel, y = y_sel, title = "Test Scatter") 
         if(is.null(input$plot_click)){
           print("null")
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-=======
->>>>>>> 2c32fc4d29b0ff2e3d0c1a9c6feea73288e7cbe5
+
           if(!is.null(pnt)){
             defaultplot + geom_point(data = pnt, aes(x,y), color="red", size = 2) 
           }
           else{
             defaultplot
           }
-          
-<<<<<<< HEAD
->>>>>>> 2c32fc4d29b0ff2e3d0c1a9c6feea73288e7cbe5
-=======
->>>>>>> 2c32fc4d29b0ff2e3d0c1a9c6feea73288e7cbe5
+
         }
         else{
           pnt <<- nearPoints(defaultplotdata, input$plot_click, maxpoints = 1)
           print(pnt)
-<<<<<<< HEAD
-<<<<<<< HEAD
-        }
-        defaultplot + geom_point(data = pnt, aes(x,y), color="red", size = 2) 
-=======
           defaultplot + geom_point(data = pnt, aes(x,y), color="red", size = 2) 
         }
-        
->>>>>>> 2c32fc4d29b0ff2e3d0c1a9c6feea73288e7cbe5
-=======
-          defaultplot + geom_point(data = pnt, aes(x,y), color="red", size = 2) 
-        }
-        
->>>>>>> 2c32fc4d29b0ff2e3d0c1a9c6feea73288e7cbe5
+
       }
     }) 
     #output data associated with the selected point on the left/"zoomed-out" plot
     output$click_info <- renderPrint({
-<<<<<<< HEAD
-<<<<<<< HEAD
       if(!is.null(input$plot_click)){
         pnt <- nearPoints(defaultplotdata, input$plot_click, maxpoints = 1)
       }
       printPoint(pnt)
-=======
-=======
->>>>>>> 2c32fc4d29b0ff2e3d0c1a9c6feea73288e7cbe5
-      if(is.null(input$plot_click)){
-        printPoint(pnt)
-      }
-      else{
-        pnt <- nearPoints(defaultplotdata, input$plot_click, maxpoints = 1)
-        printPoint(pnt)
-      }
-<<<<<<< HEAD
->>>>>>> 2c32fc4d29b0ff2e3d0c1a9c6feea73288e7cbe5
-=======
->>>>>>> 2c32fc4d29b0ff2e3d0c1a9c6feea73288e7cbe5
       
     })
     #output the right/"zoomed-out" plot

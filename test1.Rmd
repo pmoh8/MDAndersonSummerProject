@@ -128,24 +128,11 @@ ui <-
                                                                verbatimTextOutput("click_info")
                                                                )
                                                      )
-                                              ),
-                                     #display "zoomed-out" plot
-                                     fluidRow(
-                                       column(12,
-                                              wellPanel(
-                                                plotOutput("plot",
-                                                           click = "plot_click",
-                                                           brush = brushOpts(id="plot_brush")
-                                                           )
-                                                ),
-                                              "plot1")
-                                     )
-                              ), 
-                              #display scatterplot and details of the right plot ("zoomed-in" plot)
+                                              )
+                                     ),
                               column(6,
-                                     #only display the right-side panel IF the user has selected some area on the left plot
                                      conditionalPanel(condition = 'output.brushActive != 0',
-                                       #display details
+                                                       #display details
                                        fluidRow(column(1),
                                               column(10,
                                                      wellPanel("Details a2 (cell line, cancer type)")
@@ -157,19 +144,30 @@ ui <-
                                                                verbatimTextOutput("zoom_click_info")
                                                                )
                                                      )
-                                              ),
-                                       #display plot
-                                       fluidRow(column(12,
-                                                     wellPanel(
-                                                       plotOutput("plot_zoom",
-                                                                  click = "plot_zoom_click")),"plot2")
                                               )
                                        )
                                      )
-                              #please help I can't figure out which end parenthasis goes with what
+                            ),
+                            fluidRow(
+                              column(6,
+                                     wellPanel(
+                                                plotOutput("plot",
+                                                           click = "plot_click",
+                                                           brush = brushOpts(id="plot_brush")
+                                                           )
+                                                ),
+                                              "plot1"),
+                              column(6,
+                                     conditionalPanel(condition = 'output.brushActive != 0',
+                                                      wellPanel(
+                                                       plotOutput("plot_zoom",
+                                                                  click = "plot_zoom_click"))
+                                                      )
+                              )
                             )
                      )
                    )
+          
           ),
           #END SCATTERPLOT DISPLAY
           tabPanel("Heatmap", verbatimTextOutput("summary"))
@@ -215,8 +213,8 @@ server <- function(input, output) {
       x <- sapply(inputdata_x[inputdata_x[,"SYMBOL"]==x_sel,-c(1:5)], as.numeric)
       y <- sapply(inputdata_y[inputdata_y[,"SYMBOL"]==y_sel,-c(1:5)], as.numeric)
       
-      DEFAULTPLOT <<- data.frame(x = x, y = y)
-      ggplot(DEFAULTPLOT, aes(x,y)) + geom_point(alpha=.3, color="blue") + labs(x = x_sel, y = y_sel, title = "Test Scatter")
+      defaultplot <<- data.frame(x = x, y = y)
+      ggplot(defaultplot, aes(x,y)) + geom_point(alpha=.3, color="blue") + labs(x = x_sel, y = y_sel, title = "Test Scatter")
     }
     
     #ggplot(testdata, aes(x,y)) + geom_point(alpha=.5, color="blue")
@@ -224,17 +222,17 @@ server <- function(input, output) {
   }) 
   #output data associated with the selected point on the left/"zoomed-out" plot
   output$click_info <- renderPrint({
-    nearPoints(DEFAULTPLOT, input$plot_click, maxpoints = 1)
+    nearPoints(defaultplot, input$plot_click, maxpoints = 1)
   })
   #output the right/"zoomed-out" plot
   output$plot_zoom<- renderPlot({ 
     print("zoom")
-    plotdata$zoomdata <- brushedPoints(DEFAULTPLOT,input$plot_brush)
+    plotdata$zoomdata <- brushedPoints(defaultplot,input$plot_brush)
     ggplot(plotdata$zoomdata, aes(x,y)) + geom_point(alpha=.5, color="blue")
   }) 
   #output data associated with the selected point on the right/"zoomed-in" plot
   output$zoom_click_info <- renderPrint({
-    nearPoints(DEFAULTPLOT, input$plot_zoom_click, maxpoints = 1)
+    nearPoints(defaultplot, input$plot_zoom_click, maxpoints = 1)
   })
 
 }

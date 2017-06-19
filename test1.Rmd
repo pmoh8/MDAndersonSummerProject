@@ -191,8 +191,8 @@ server <- function(input, output) {
   testdata <- data.frame(x = x, y = y)
   plotdata <- reactiveValues(zoomdata=testdata)
 #END TEST VALUES
-testdata_txt <- read.table("CCLE_copynumber_byGene_2013-12-03.txt",sep ="\t",header=T)
-    
+  inputdata_x <- readRDS("CCLE_copynumber_byGene_2013-12-03")
+  inputdata_y <- inputdata_x  
   #check flags and whatnot
   observeEvent(plotdata$zoomdata, {
    if(is.data.frame(plotdata$zoomdata) && nrow(plotdata$zoomdata)==0) {
@@ -212,12 +212,11 @@ testdata_txt <- read.table("CCLE_copynumber_byGene_2013-12-03.txt",sep ="\t",hea
     y_sel <- input$gene_y
     #Select the appropriate rows from our database table based on user input
     if(x_sel != " " && y_sel != " "){
-      x <- sapply(testdata_txt[testdata_txt[,"SYMBOL"]==x_sel,-c(1:5)], as.numeric)
-      y <- sapply(testdata_txt[testdata_txt[,"SYMBOL"]==y_sel,-c(1:5)], as.numeric)
+      x <- sapply(inputdata_x[inputdata_x[,"SYMBOL"]==x_sel,-c(1:5)], as.numeric)
+      y <- sapply(inputdata_y[inputdata_y[,"SYMBOL"]==y_sel,-c(1:5)], as.numeric)
       
-      plotdata= data.frame(x = x, y = y)
-      p<-ggplot(plotdata, aes(x,y)) + geom_point(alpha=.3, color="blue") + labs(x = x_sel, y = y_sel, title = "Test Scatter")
-      p
+      DEFAULTPLOT <<- data.frame(x = x, y = y)
+      ggplot(DEFAULTPLOT, aes(x,y)) + geom_point(alpha=.3, color="blue") + labs(x = x_sel, y = y_sel, title = "Test Scatter")
     }
     
     #ggplot(testdata, aes(x,y)) + geom_point(alpha=.5, color="blue")
@@ -225,17 +224,17 @@ testdata_txt <- read.table("CCLE_copynumber_byGene_2013-12-03.txt",sep ="\t",hea
   }) 
   #output data associated with the selected point on the left/"zoomed-out" plot
   output$click_info <- renderPrint({
-    nearPoints(testdata, input$plot_click, maxpoints = 1)
+    nearPoints(DEFAULTPLOT, input$plot_click, maxpoints = 1)
   })
   #output the right/"zoomed-out" plot
   output$plot_zoom<- renderPlot({ 
     print("zoom")
-    plotdata$zoomdata <- brushedPoints(testdata,input$plot_brush)
+    plotdata$zoomdata <- brushedPoints(DEFAULTPLOT,input$plot_brush)
     ggplot(plotdata$zoomdata, aes(x,y)) + geom_point(alpha=.5, color="blue")
   }) 
   #output data associated with the selected point on the right/"zoomed-in" plot
   output$zoom_click_info <- renderPrint({
-    nearPoints(testdata, input$plot_zoom_click, maxpoints = 1)
+    nearPoints(DEFAULTPLOT, input$plot_zoom_click, maxpoints = 1)
   })
 
 }
@@ -294,7 +293,7 @@ p
 ##TESTING SPACE FOR READING A TXT AND DISPLAYING THE DATA
 source("common2.R")
 library(ggplot2)
-testdata_txt <- read.table("CCLE_copynumber_byGene_2013-12-03.txt",sep ="\t",header=T)
+testdata_txt <- readRDS("CCLE_copynumber_byGene_2013-12-03")
 x_sel <- "A1BG"
 y_sel <- "CDH2"
 print(head(testdata_txt))

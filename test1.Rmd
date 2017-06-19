@@ -60,8 +60,11 @@ ui <-
                                                      "CDH2" = "CDH2"
                                                      ))
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 >>>>>>> 4ef257d6265b151ed739a2befec6bb84a8e1776a
+=======
+>>>>>>> 2c32fc4d29b0ff2e3d0c1a9c6feea73288e7cbe5
 =======
 >>>>>>> 2c32fc4d29b0ff2e3d0c1a9c6feea73288e7cbe5
                                        ),
@@ -174,6 +177,10 @@ server <- function(input, output) {
     inputdata_y <- inputdata_x 
     defaultplotdata <- inputdata_x
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+    pnt <- NULL
+>>>>>>> 2c32fc4d29b0ff2e3d0c1a9c6feea73288e7cbe5
 =======
     pnt <- NULL
 >>>>>>> 2c32fc4d29b0ff2e3d0c1a9c6feea73288e7cbe5
@@ -216,7 +223,10 @@ server <- function(input, output) {
         if(is.null(input$plot_click)){
           print("null")
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
+=======
+>>>>>>> 2c32fc4d29b0ff2e3d0c1a9c6feea73288e7cbe5
           if(!is.null(pnt)){
             defaultplot + geom_point(data = pnt, aes(x,y), color="red", size = 2) 
           }
@@ -224,14 +234,23 @@ server <- function(input, output) {
             defaultplot
           }
           
+<<<<<<< HEAD
+>>>>>>> 2c32fc4d29b0ff2e3d0c1a9c6feea73288e7cbe5
+=======
 >>>>>>> 2c32fc4d29b0ff2e3d0c1a9c6feea73288e7cbe5
         }
         else{
           pnt <<- nearPoints(defaultplotdata, input$plot_click, maxpoints = 1)
           print(pnt)
 <<<<<<< HEAD
+<<<<<<< HEAD
         }
         defaultplot + geom_point(data = pnt, aes(x,y), color="red", size = 2) 
+=======
+          defaultplot + geom_point(data = pnt, aes(x,y), color="red", size = 2) 
+        }
+        
+>>>>>>> 2c32fc4d29b0ff2e3d0c1a9c6feea73288e7cbe5
 =======
           defaultplot + geom_point(data = pnt, aes(x,y), color="red", size = 2) 
         }
@@ -242,11 +261,14 @@ server <- function(input, output) {
     #output data associated with the selected point on the left/"zoomed-out" plot
     output$click_info <- renderPrint({
 <<<<<<< HEAD
+<<<<<<< HEAD
       if(!is.null(input$plot_click)){
         pnt <- nearPoints(defaultplotdata, input$plot_click, maxpoints = 1)
       }
       printPoint(pnt)
 =======
+=======
+>>>>>>> 2c32fc4d29b0ff2e3d0c1a9c6feea73288e7cbe5
       if(is.null(input$plot_click)){
         printPoint(pnt)
       }
@@ -254,6 +276,9 @@ server <- function(input, output) {
         pnt <- nearPoints(defaultplotdata, input$plot_click, maxpoints = 1)
         printPoint(pnt)
       }
+<<<<<<< HEAD
+>>>>>>> 2c32fc4d29b0ff2e3d0c1a9c6feea73288e7cbe5
+=======
 >>>>>>> 2c32fc4d29b0ff2e3d0c1a9c6feea73288e7cbe5
       
     })

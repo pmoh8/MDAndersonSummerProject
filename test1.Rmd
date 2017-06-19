@@ -8,9 +8,10 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r, eval = T, echo = F}
+```{r, eval = F, echo = F}
 library(shiny)
 library(ggplot2)
+source("common2.R")
 #User Interface
 ui <- 
   fluidPage( 
@@ -55,12 +56,55 @@ ui <-
                                 #input to select which gene is displayed on the x-axis
                                 column(5,
                                        selectInput("gene_x", NULL,
+<<<<<<< HEAD
                                                    c("Gene1" = "gene1"))
+=======
+                                                   c("---" = " ",
+                                                     "A1BG" = "A1BG",
+                                                     "CDH2" = "CDH2",
+                                                     "A375-311" = "gene1",
+                                                     "A-673-311" = "gene2",
+                                                     "BxPC3-311" = "gene3",
+                                                     "CADO-ES-1-311" = "gene4",
+                                                     "CAL-120-311" = "gene5",
+                                                     "COLO-741-311" = "gene6",
+                                                     "COR-L105-311" = "gene7",
+                                                     "EW8-311" = "gene8",
+                                                     "EWS502-311" = "gene9",
+                                                     "G-402-311" = "gene10",
+                                                     "HCC44-311" = "gene11",
+                                                     "Hs294T-311" = "gene12",
+                                                     "HT-29-311" = "gene13",
+                                                     "K562-311" = "gene14",
+                                                     "L3.3-311" = "gene15",
+                                                     "LNCaP Clone FGC-311" = "gene16",
+                                                     "MeWo-311" = "gene17",
+                                                     "MHH-ES-1-311" = "gene18",
+                                                     "NCI-H1373-311" = "gene19",
+                                                     "NCI-H2009-311" = "gene20",
+                                                     "Panc.03.27-311" = "gene21",
+                                                     "Panc 08.13-311" = "gene22",
+                                                     "Panc1-311" = "gene23",
+                                                     "PA-TU-8902-311" = "gene24",
+                                                     "PA-TU-8988T-311" = "gene25",
+                                                     "PC-3-311" = "gene26",
+                                                     "RD-ES-311" = "gene27",
+                                                     "SK-ES-1-311" = "gene28",
+                                                     "SU.86.86-311" = "gene29",
+                                                     "T-47D-311" = "gene30",
+                                                     "TC32-311" = "gene31",
+                                                     "TC-71-311" = "gene32",
+                                                     "TOV112D-311" = "gene33"
+                                                     ))
+>>>>>>> e93a0d14e2e17552b7960179856361fe87a1119b
                                        ),
                                 #input to select which gene is displayed on the y-axis
                                 column(5,
                                        selectInput("gene_y", NULL,
-                                                   c("Gene1" = "gene1",
+                                                   c("---" = " ",
+                                                     "A1BG" = "A1BG",
+                                                     "CDH2" = "CDH2",
+                                                     "Gene1" = "gene1",
                                                      "Gene2" = "gene2",
                                                      "Gene3" = "gene3")))
                                 )
@@ -88,24 +132,11 @@ ui <-
                                                                verbatimTextOutput("click_info")
                                                                )
                                                      )
-                                              ),
-                                     #display "zoomed-out" plot
-                                     fluidRow(
-                                       column(12,
-                                              wellPanel(
-                                                plotOutput("plot",
-                                                           click = "plot_click",
-                                                           brush = brushOpts(id="plot_brush")
-                                                           )
-                                                ),
-                                              "plot1")
-                                     )
-                              ), 
-                              #display scatterplot and details of the right plot ("zoomed-in" plot)
+                                              )
+                                     ),
                               column(6,
-                                     #only display the right-side panel IF the user has selected some area on the left plot
                                      conditionalPanel(condition = 'output.brushActive != 0',
-                                       #display details
+                                                       #display details
                                        fluidRow(column(1),
                                               column(10,
                                                      wellPanel("Details a2 (cell line, cancer type)")
@@ -117,19 +148,30 @@ ui <-
                                                                verbatimTextOutput("zoom_click_info")
                                                                )
                                                      )
-                                              ),
-                                       #display plot
-                                       fluidRow(column(12,
-                                                     wellPanel(
-                                                       plotOutput("plot_zoom",
-                                                                  click = "plot_zoom_click")),"plot2")
                                               )
                                        )
                                      )
-                              #please help I can't figure out which end parenthasis goes with what
+                            ),
+                            fluidRow(
+                              column(6,
+                                     wellPanel(
+                                                plotOutput("plot",
+                                                           click = "plot_click",
+                                                           brush = brushOpts(id="plot_brush")
+                                                           )
+                                                ),
+                                              "plot1"),
+                              column(6,
+                                     conditionalPanel(condition = 'output.brushActive != 0',
+                                                      wellPanel(
+                                                       plotOutput("plot_zoom",
+                                                                  click = "plot_zoom_click"))
+                                                      )
+                              )
                             )
                      )
                    )
+          
           ),
           #END SCATTERPLOT DISPLAY
           tabPanel("Heatmap", verbatimTextOutput("summary"))
@@ -143,78 +185,127 @@ server <- function(input, output) {
   output$brushActive <- reactive({ return(flags$brushActive) })
   
   outputOptions(output, name = "brushActive", suspendWhenHidden = FALSE)
-  #check flags and whatnot
-  # observeEvent(zoomdata, {
-  #  if(!(is.null(zoomdata))) {
-  #    flags$brushActive <- 1 
-  #  }
-  # })
-  # 
-  observeEvent(input$plot_click,{
-    zoomdata <- NULL
-    flags$brushActive <- 1
-  })      
+    
   
 #BEGIN TEST VALUES
   x <- rnorm(500)
   y <- rnorm(500)
   testdata <- data.frame(x = x, y = y)
-
+  plotdata <- reactiveValues(zoomdata=testdata)
 #END TEST VALUES
-  
+  inputdata_x <- readRDS("CCLE_copynumber_byGene_2013-12-03")
+  inputdata_y <- inputdata_x  
+  #check flags and whatnot
+  observeEvent(plotdata$zoomdata, {
+   if(is.data.frame(plotdata$zoomdata) && nrow(plotdata$zoomdata)==0) {
+      flags$brushActive <- 0
+      print("brush is not active")
+   }
+    else{
+      flags$brushActive <- 1
+      print("brush is active!")
+    }
+  })
+  observeEvent(input$plot_brush,{plotdata$zoomdata <- brushedPoints(testdata,input$plot_brush)})
+
   #output the left/"zoomed-out" plot
   output$plot<- renderPlot({ 
-    ggplot(testdata, aes(x,y, alpha=.5, color="blue")) + geom_point(aes(alpha=.5, color="blue"))
+    x_sel <- input$gene_x
+    y_sel <- input$gene_y
+    #Select the appropriate rows from our database table based on user input
+    if(x_sel != " " && y_sel != " "){
+      x <- sapply(inputdata_x[inputdata_x[,"SYMBOL"]==x_sel,-c(1:5)], as.numeric)
+      y <- sapply(inputdata_y[inputdata_y[,"SYMBOL"]==y_sel,-c(1:5)], as.numeric)
+      
+      defaultplot <<- data.frame(x = x, y = y)
+      ggplot(defaultplot, aes(x,y)) + geom_point(alpha=.3, color="blue") + labs(x = x_sel, y = y_sel, title = "Test Scatter")
+    }
+    
+    #ggplot(testdata, aes(x,y)) + geom_point(alpha=.5, color="blue")
     #qplot(testdata$x,testdata$y, alpha = .50, color = "blue") 
   }) 
   #output data associated with the selected point on the left/"zoomed-out" plot
   output$click_info <- renderPrint({
-    nearPoints(testdata, input$plot_click, maxpoints = 1)
+    nearPoints(defaultplot, input$plot_click, maxpoints = 1)
   })
   #output the right/"zoomed-out" plot
   output$plot_zoom<- renderPlot({ 
-    zoomdata <- brushedPoints(testdata,input$plot_brush)
-    flags$brushActive <- 1 
-    ggplot(zoomdata, aes(x,y, alpha=.5, color="blue")) + geom_point(aes(alpha=.5, color="blue"))
+    print("zoom")
+    plotdata$zoomdata <- brushedPoints(defaultplot,input$plot_brush)
+    ggplot(plotdata$zoomdata, aes(x,y)) + geom_point(alpha=.5, color="blue")
   }) 
   #output data associated with the selected point on the right/"zoomed-in" plot
   output$zoom_click_info <- renderPrint({
-    nearPoints(testdata, input$plot_zoom_click, maxpoints = 1)
+    nearPoints(defaultplot, input$plot_zoom_click, maxpoints = 1)
   })
 
 }
 shinyApp(ui = ui, server = server)
 ```
 ```{r, eval = F}
+##TESTING SPACE FOR READING A GCT AND DISPLAYING DATA
 source("common2.R")
-stuff <- read.gct("Achilles_v3.3.8_rawreadcounts.gct")$data
-stuff <- read.table("CCLE_copynumber_byGene_2013-12-03.txt",sep ="\t",header=T)
-print(stuff)
+library(ggplot2)
+testdata_Achilles <- read.gct("Achilles_v3.3.8.gct")$data
+#print(head(testdata_Achilles, 10))
+print(colnames(testdata_Achilles))
+x_sel <- "MIR3129" #"A375_SKIN"
+y_sel <- "SESTD1" #"A673_BONE"
+x <- testdata_Achilles[grep(x_sel, rownames(testdata_Achilles)),][1,]
+y <- testdata_Achilles[grep(y_sel, rownames(testdata_Achilles)),][1,]
+print(x)
+print(y)
+plotdata= data.frame(x = x, y = y)
+p<-ggplot(plotdata, aes(x,y)) + geom_point(alpha=.3, color="blue") + labs(x = x_sel, y = y_sel, title = "Test Scatter")
+p
 
-# annotation <- read.table("CCLE_sample_info_file_2012-10-18.txt",sep ="\t",header=T)
+
+#print(testdata_Achilles[,"A375_SKIN"])
+#print(testdata_Achilles[,"A673_BONE"])
+# stuff <- read.gct("Achilles_v3.3.8_rawreadcounts.gct")$data
+# stuff <- read.table("CCLE_copynumber_byGene_2013-12-03.txt",sep ="\t",header=T)
+# #print(stuff)
 # 
-# list <- annotation[,c("CCLE.name","Site.Primary")]
+#  annotation <- read.table("CCLE_sample_info_file_2012-10-18.txt",sep ="\t",header=T)
+# 
+#  list <- annotation[,c("CCLE.name","Site.Primary")]
 # list <- split(list[,"CCLE.name"],list[,"Site.Primary"])
-# print(list)
-# stuff1 <- do.call(cbind, lapply(list, function(x){
-#    rowMeans(stuff[,as.character(x)])
-#  }))
-
+#  #print(list)
+#  stuff1 <- do.call(cbind, lapply(list, function(x){
+#     rowMeans(stuff[,as.character(x)])
+#   }))
 # 
+#  underscore <- regexpr("_",colnames(stuff))
+#  cell_lines <- substring(colnames(stuff), 1, underscore-1)
+#  cancer_type <- substring(colnames(stuff), underscore+1)
+#  skin <- stuff[,grep("EGID|SYMBOL|CHR|CHRLOC|CHRLOCEND|SKIN", colnames(stuff))]
 # 
-# underscore <- regexpr("_",colnames(stuff))
-# cell_lines <- substring(colnames(stuff), 1, underscore-1)
-# cancer_type <- substring(colnames(stuff), underscore+1)
-# skin <- stuff[,grep("EGID|SYMBOL|CHR|CHRLOC|CHRLOCEND|SKIN", colnames(stuff))]
+#  for(i in cell_lines){
+#    columns <- grep(i, colnames(stuff))
 # 
-# for(i in cell_lines){
-#   columns <- grep(i, colnames(stuff))
-#   
 # }
 # 
 # 
 # table(list$Site.Primary)
+# 
+# correlations <- cor(stuff[,6:30])
+# heatmap(correlations)
+```
+```{r, eval = T}
+##TESTING SPACE FOR READING A TXT AND DISPLAYING THE DATA
+source("common2.R")
+library(ggplot2)
+testdata_txt <- readRDS("CCLE_copynumber_byGene_2013-12-03")
+x_sel <- "A1BG"
+y_sel <- "CDH2"
+print(head(testdata_txt))
+#Select the appropriate rows from our database table based on user input
+x <- sapply(testdata_txt[testdata_txt[,"SYMBOL"]==x_sel,-c(1:5)], as.numeric)
+y <- sapply(testdata_txt[testdata_txt[,"SYMBOL"]==y_sel,-c(1:5)], as.numeric)
 
-#correlations <- cor(stuff[,6:30])
-#heatmap(correlations,margins=c(10,10))
+plotdata= data.frame(x = x, y = y)
+p<-ggplot(plotdata, aes(x,y)) + geom_point(alpha=.3, color="blue") + labs(x = x_sel, y = y_sel, title = "Test Scatter")
+p
+
+
 ```

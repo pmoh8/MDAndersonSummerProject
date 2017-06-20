@@ -52,23 +52,9 @@ ui <-
                               fluidRow(
                                 column(2,"Gene"),
                                 #input to select which gene is displayed on the x-axis
-                                column(5,
-                                       selectInput("gene_x", NULL,
-                                                   c("A1BG" = "A1BG",
-                                                     "---" = " ",
-                                                     
-                                                     "CDH2" = "CDH2"
-                                                     ))
-                                       ),
+                                column(5, uiOutput("gene_x_selector")),
                                 #input to select which gene is displayed on the y-axis
-                                column(5,
-                                       selectInput("gene_y", NULL,
-                                                   c("CDH2" = "CDH2",
-                                                     "---" = " ",
-                                                     "A1BG" = "A1BG",
-                                                     "Gene1" = "gene1",
-                                                     "Gene2" = "gene2",
-                                                     "Gene3" = "gene3")))
+                                column(5, uiOutput("gene_y_selector"))
                                 )
                               ),
                             br(),
@@ -76,8 +62,8 @@ ui <-
                             selectInput("variable", NULL,
                                         c("Cancer1" = "cancer1",
                                           "Cancer2" = "cancer2",
-                                          "Cancer3" = "cancer3")),
-                            checkboxInput("showSelected", "Show selected cancers only?", FALSE)
+                                          "Cancer3" = "cancer3"), multiple = TRUE),
+                            checkboxInput("showSelected", "Show selected cancers only", FALSE)
                             ),
                    ##################################################
                    ######## INFORMATION DISPLAY (MAIN PANEL) ########
@@ -91,8 +77,7 @@ ui <-
                               column(6, 
                                      #display details
                                      fluidRow(column(1),
-                                              column(10,
-                                                     wellPanel(uiOutput("cell_details")))
+                                              column(10, wellPanel(uiOutput("cell_details")))
                                               )
                                      ),
                               #display details of the right plot ("zoomed-in" plot)
@@ -100,9 +85,8 @@ ui <-
                                      #only display IF the user has selected a potion of the left plot
                                      conditionalPanel(condition = 'output.brushActive != 0',
                                        fluidRow(column(1),
-                                                column(10,
-                                                     wellPanel(uiOutput("cell_zoom_details")))
-                                              )
+                                                column(10, wellPanel(uiOutput("cell_zoom_details")))
+                                                )
                                        )
                                      )
                             ),
@@ -112,16 +96,13 @@ ui <-
                             fluidRow(
                               column(6,
                                      fluidRow(column(1),
-                                              column(10,
-                                                     wellPanel(verbatimTextOutput("click_info")))
+                                              column(10, wellPanel(tableOutput("click_info")))
                                               )
                                      ),
                               column(6,
                                      conditionalPanel(condition = 'output.brushActive != 0',
                                      fluidRow(column(1),
-                                                 column(10,
-                                                     wellPanel(verbatimTextOutput("zoom_click_info"))
-                                                     )
+                                                 column(10, wellPanel(tableOutput("zoom_click_info")))
                                               )
                                      )
                                      )
@@ -183,6 +164,12 @@ server <- function(input, output) {
     inputdata_y <- inputdata_x 
     pnt <- NULL
     pnt_zoom <- NULL
+    
+    DNAcopy_options <- reactive({
+      return(readRDS("DNAcopy_options_CCLE_copynumber_byGene_2013-12-03"))
+    })
+    
+    # DNAcopy_options <- unique(inputdata_x[,"SYMBOL"])
 
   ###################################
   ######## CHECK EVENT FLAGS ########
@@ -205,7 +192,18 @@ server <- function(input, output) {
     })
     #If the user has selected data points with the brush, save them to the reactiveValue "zoomdata"
     observeEvent(input$plot_brush,{plotdata$zoomdata <- brushedPoints(testdata,input$plot_brush)})
-  
+  #######################################
+  ####### RENDERING USER OPTIONS ########
+  #######################################
+    output$gene_x_selector <- renderUI({
+      selectInput("gene_x", NULL, DNAcopy_options())
+      # selectInput("gene_x", NULL, as.list(DNAcopy_options))
+    })
+    
+    y_options <- unique(inputdata_y[,"SYMBOL"])
+    output$gene_y_selector <- renderUI({
+      selectInput("gene_y", NULL, DNAcopy_options())
+    })
   ##################################
   ####### RENDERING OUTPUTS ########
   ##################################
@@ -222,38 +220,26 @@ server <- function(input, output) {
         defaultplotdata <<- data.frame(x = x, y = y)
         
         #Create our plot
-        defaultplot <<- ggplot() + geom_point(data = defaultplotdata, aes(x,y), alpha=transp, color=colLtBlu) + labs(x = x_sel, y = y_sel, title = "Test Scatter") 
+        defaultplot <<- ggplot() + geom_point(data = defaultplotdata, aes(x,y), alpha=transp, color=colLtBlu) + labs(x = x_sel, y = y_sel, title = "Test Scatter")
+        #Add the tiny point representing the point selected in the "zoomed-in" plot
         if(!is.null(pnt_zoom)){
             defaultplot <<- defaultplot + geom_point(data = pnt_zoom, aes(x,y), color=colOrn, size = ptMed) 
           }
-        if(is.null(input$plot_zoom_click)){
-          #If a point was selected, highlight it with a solid red dot
-          if(!is.null(pnt_zoom)){
-            defaultplot + geom_point(data = pnt_zoom, aes(x,y), color=colOrn, size = ptMed) 
-          }
-          #if no point was selected, print the graph without a highlighted point
-          else{ defaultplot }
-        }
-        #If there is a mouse click, update the saved point with the new point and print it to the graph
-        else{
+        if(!is.null(input$plot_zoom_click) || (is.null(input$plot_zoom_click) && !is.null(pnt_zoom))){
           defaultplot + geom_point(data = pnt_zoom, aes(x,y), color=colOrn, size = ptMed) 
         }
+        else{ defaultplot }
+        
       #If the user has selected a point, highlight it on the scatterplot
         #If there is no mouse click, continue printing out the same graph as previously 
           #(Prevent the highlighted point from flickering in and out of existence between clicks)
-        if(is.null(input$plot_click)){
-          #If a point was selected, highlight it with a solid red dot
-          if(!is.null(pnt)){
-            defaultplot + geom_point(data = pnt, aes(x,y), color=colRed, size = ptBig, shape = 17) 
-          }
-          #if no point was selected, print the graph without a highlighted point
-          else{
-            defaultplot
-          }
+        if(is.null(input$plot_click) && is.null (pnt) ){
+          defaultplot
         }
-        #If there is a mouse click, update the saved point with the new point and print it to the graph
         else{
-          pnt <<- nearPoints(defaultplotdata, input$plot_click, maxpoints = 1)
+          if(!is.null(input$plot_click)){
+            pnt <<- nearPoints(defaultplotdata, input$plot_click, maxpoints = 1)
+          }
           defaultplot + geom_point(data = pnt, aes(x,y), color=colRed, size = ptBig, shape = 17) 
         }
       }
@@ -265,10 +251,11 @@ server <- function(input, output) {
     })
     
     #output data associated with the selected point on the left/"zoomed-out" plot
-    output$click_info <- renderPrint({
+    output$click_info <- renderTable({
       if(!is.null(input$plot_click)){}
       printPoint(pnt)
-    })
+      
+    },bordered = TRUE, spacing = 'xs', rownames = TRUE,colnames = TRUE)
     
     
     #output the right/"zoomed-in" plot
@@ -278,13 +265,8 @@ server <- function(input, output) {
       zoomplot<<-ggplot(plotdata$zoomdata, aes(x,y)) + geom_point(alpha=transp, color=colLtBlu) + geom_point(data = pnt, aes(x,y), color=colRed, size = ptMed) 
       
       #Allow for point that was selected on hte "zoomed-out" plot to appear in the "zoomed-in" plot
-      if(is.null(input$plot_click)){
-          #If a point was selected, highlight it with a solid red dot
-          if(!is.null(pnt)){
-            zoomplot + geom_point(data = pnt, aes(x,y), color=colRed, size = ptMed) 
-          }
-          #if no point was selected, print the graph without a highlighted point
-          else{ zoomplot }
+        if(is.null(input$plot_click) && is.null(pnt)){
+          zoomplot
         }
         #If there is a mouse click, update the saved point with the new point and print it to the graph
         else{
@@ -294,17 +276,13 @@ server <- function(input, output) {
        #If the user has selected a point on the "zoomed-in" plot, highlight it on the scatterplot
         #If there is no mouse click, continue printing out the same graph as previously 
           #(Prevent the highlighted point from flickering in and out of existence between clicks)
-        if(is.null(input$plot_zoom_click)){
-          #If a point was selected, highlight it with a solid red dot
-          if(!is.null(pnt_zoom)){
-            zoomplot + geom_point(data = pnt_zoom, aes(x,y), color=colOrn, size = ptBig, shape = 17) 
-          }
-          #if no point was selected, print the graph without a highlighted point
-          else{ zoomplot }
+        if(is.null(input$plot_zoom_click) && is.null (pnt_zoom) ){
+          zoomplot
         }
-        #If there is a mouse click, update the saved point with the new point and print it to the graph
         else{
-          pnt_zoom <<- nearPoints(defaultplotdata, input$plot_zoom_click, maxpoints = 1)
+          if(!is.null(input$plot_zoom_click)){
+            pnt_zoom <<- nearPoints(defaultplotdata, input$plot_zoom_click, maxpoints = 1)
+          }
           zoomplot + geom_point(data = pnt_zoom, aes(x,y), color=colOrn, size = ptBig, shape = 17) 
         }
     }) 
@@ -315,12 +293,10 @@ server <- function(input, output) {
     })    
     
     #output data associated with the selected point on the right/"zoomed-in" plot
-    output$zoom_click_info <- renderPrint({
-      if(!is.null(input$plot_zoom_click)){
-        #pnt <- nearPoints(defaultplotdata, input$plot_zoom_click, maxpoints = 1)
-      }
+    output$zoom_click_info <- renderTable({
+      if(!is.null(input$plot_zoom_click)){}
       printPoint(pnt_zoom)
-    })
+    },bordered = TRUE, spacing = 'xs', rownames = TRUE,colnames = TRUE)
   
   #################################
   ######## VARIOUS FUNTIONS #######
@@ -334,8 +310,12 @@ server <- function(input, output) {
       HTML(paste(str1,str2,sep='<br/>'))
     }
     printPoint <- function(point){
-      print(paste(x_sel, ": ",point$x))
-      print(paste(y_sel, ": ",point$y))
+      if(is.data.frame(point) && nrow(point)!=0) {
+        pointDetail <- data.frame(x = point$x, y = point$y)
+        names(pointDetail)<-c(x_sel,y_sel)
+        row.names(pointDetail)<-c("DNA Copy #")
+        return (pointDetail)
+      }
     }
 
 }

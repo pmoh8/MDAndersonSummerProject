@@ -58,11 +58,8 @@ ui <-
                                 )
                               ),
                             br(),
-                            "Select a cancer type to highlight",
-                            selectInput("variable", NULL,
-                                        c("Cancer1" = "cancer1",
-                                          "Cancer2" = "cancer2",
-                                          "Cancer3" = "cancer3"), multiple = TRUE),
+                            "Cancer type(s) to highlight",
+                            uiOutput("cancer_selector"),
                             checkboxInput("showSelected", "Show selected cancers only", FALSE)
                             ),
                    ##################################################
@@ -168,7 +165,7 @@ server <- function(input, output) {
     DNAcopy_options <- reactive({
       return(readRDS("DNAcopy_options_CCLE_copynumber_byGene_2013-12-03"))
     })
-    
+    cancer_options <- readRDS("cancerTypes_CCLE_copynumber_byGene_2013-12-03")
     # DNAcopy_options <- unique(inputdata_x[,"SYMBOL"])
 
   ###################################
@@ -195,6 +192,9 @@ server <- function(input, output) {
   #######################################
   ####### RENDERING USER OPTIONS ########
   #######################################
+    output$cancer_selector <- renderUI({
+      selectInput("variable", NULL, cancer_options, multiple = TRUE)
+    })
     output$gene_x_selector <- renderUI({
       selectInput("gene_x", NULL, DNAcopy_options())
       # selectInput("gene_x", NULL, as.list(DNAcopy_options))
@@ -224,7 +224,8 @@ server <- function(input, output) {
         #Add the tiny point representing the point selected in the "zoomed-in" plot
         if(!is.null(pnt_zoom)){
             defaultplot <<- defaultplot + geom_point(data = pnt_zoom, aes(x,y), color=colOrn, size = ptMed) 
-          }
+        }
+        
         if(!is.null(input$plot_zoom_click) || (is.null(input$plot_zoom_click) && !is.null(pnt_zoom))){
           defaultplot + geom_point(data = pnt_zoom, aes(x,y), color=colOrn, size = ptMed) 
         }
@@ -326,18 +327,18 @@ shinyApp(ui = ui, server = server)
 ##TESTING SPACE FOR READING A GCT AND DISPLAYING DATA
 source("common2.R")
 library(ggplot2)
-testdata_Achilles <- read.gct("Achilles_v3.3.8.gct")$data
-#print(head(testdata_Achilles, 10))
-print(colnames(testdata_Achilles))
-x_sel <- "MIR3129" #"A375_SKIN"
-y_sel <- "SESTD1" #"A673_BONE"
-x <- testdata_Achilles[grep(x_sel, rownames(testdata_Achilles)),][1,]
-y <- testdata_Achilles[grep(y_sel, rownames(testdata_Achilles)),][1,]
-print(x)
-print(y)
-plotdata= data.frame(x = x, y = y)
-p<-ggplot(plotdata, aes(x,y)) + geom_point(alpha=.3, color="blue") + labs(x = x_sel, y = y_sel, title = "Test Scatter")
-p
+# testdata_Achilles <- read.gct("Achilles_v3.3.8.gct")$data
+# #print(head(testdata_Achilles, 10))
+# print(colnames(testdata_Achilles))
+# x_sel <- "MIR3129" #"A375_SKIN"
+# y_sel <- "SESTD1" #"A673_BONE"
+# x <- testdata_Achilles[grep(x_sel, rownames(testdata_Achilles)),][1,]
+# y <- testdata_Achilles[grep(y_sel, rownames(testdata_Achilles)),][1,]
+# print(x)
+# print(y)
+# plotdata= data.frame(x = x, y = y)
+# p<-ggplot(plotdata, aes(x,y)) + geom_point(alpha=.3, color="blue") + labs(x = x_sel, y = y_sel, title = "Test Scatter")
+# p
 
 
 #print(testdata_Achilles[,"A375_SKIN"])
@@ -346,27 +347,26 @@ p
 # stuff <- read.table("CCLE_copynumber_byGene_2013-12-03.txt",sep ="\t",header=T)
 # #print(stuff)
 # 
-#  annotation <- read.table("CCLE_sample_info_file_2012-10-18.txt",sep ="\t",header=T)
+  annotation <- read.table("CCLE_sample_info_file_2012-10-18.txt",sep ="\t",header=T)
 # 
-#  list <- annotation[,c("CCLE.name","Site.Primary")]
-# list <- split(list[,"CCLE.name"],list[,"Site.Primary"])
-#  #print(list)
+  list <- annotation[,c("CCLE.name","Site.Primary")]
+ list <- split(list[,"CCLE.name"],list[,"Site.Primary"])
+  print(list)
 #  stuff1 <- do.call(cbind, lapply(list, function(x){
 #     rowMeans(stuff[,as.character(x)])
 #   }))
 # 
-#  underscore <- regexpr("_",colnames(stuff))
-#  cell_lines <- substring(colnames(stuff), 1, underscore-1)
-#  cancer_type <- substring(colnames(stuff), underscore+1)
-#  skin <- stuff[,grep("EGID|SYMBOL|CHR|CHRLOC|CHRLOCEND|SKIN", colnames(stuff))]
+  underscore <- regexpr("_",colnames(stuff))
+  cell_lines <- substring(colnames(stuff), 1, underscore-1)
+  cancer_type <- substring(colnames(stuff), underscore+1)
+
 # 
 #  for(i in cell_lines){
 #    columns <- grep(i, colnames(stuff))
-# 
 # }
 # 
 # 
-# table(list$Site.Primary)
+ table(list$Site.Primary)
 # 
 # correlations <- cor(stuff[,6:30])
 # heatmap(correlations)

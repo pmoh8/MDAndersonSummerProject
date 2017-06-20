@@ -34,24 +34,24 @@ ui <-
                    ##############################################
                      column(3,
                           wellPanel(
-                        #labels for data selection options
+                          #labels for data selection options
                           fluidRow(   column(2),   column(5, "x-axis"),   column(5, "y-axis")   ),
-                        #row to select data types to view (such as RNAseq or DNA copy number)
+                          #row to select data types to view (such as RNAseq or DNA copy number)
                           fluidRow(
                             column(2, "Data"),
-                        #input to select which data type is displayed on the x-axis
+                          #input to select which data type is displayed on the x-axis
                           column(5,
                                   selectInput("datatype_x", NULL,c("DNA Copy Number"))
                                 ),
-                        #input to select which data type is displayed on the y-axis
+                          #input to select which data type is displayed on the y-axis
                           column(5,
                                   selectInput("datatype_y", NULL, c("DNA Copy Number"))
                                 )
                               ),
-                        #row to select which gene to view
+                          #row to select which gene to view
                           fluidRow(
                             column(2,"Gene"),
-                        #input to select which gene is displayed on the x-axis
+                          #input to select which gene is displayed on the x-axis
                           column(5,
                             selectInput("gene_x", NULL,
                                         c("A1BG" = "A1BG",

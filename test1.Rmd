@@ -83,22 +83,16 @@ ui <-
                    ######## INFORMATION DISPLAY (MAIN PANEL) ########
                    ##################################################
                      column(9,
-                            #####################################
-                            ######## POINT DETAIL DISPLAY #######
-                            #####################################
+                            ##############################################################
+                            ######## POINT DETAIL DISPLAY (Cell line, Cancer Type) #######
+                            ##############################################################
                             fluidRow(
                               #display details of the left plot ("zoomed-out" plot)
                               column(6, 
                                      #display details
                                      fluidRow(column(1),
                                               column(10,
-                                                     wellPanel("Details 1a (cell line, cancer type)"))),
-                                     fluidRow(column(1),
-                                              column(10,
-                                                     wellPanel("Details 1b (rnaseq info, dna copy, etc)",
-                                                               verbatimTextOutput("click_info")
-                                                               )
-                                                     )
+                                                     wellPanel(uiOutput("cell_details")))
                                               )
                                      ),
                               #display details of the right plot ("zoomed-in" plot)
@@ -107,16 +101,29 @@ ui <-
                                      conditionalPanel(condition = 'output.brushActive != 0',
                                        fluidRow(column(1),
                                                 column(10,
-                                                     wellPanel("Details a2 (cell line, cancer type)"))
-                                              ),
-                                        fluidRow(column(1),
-                                                 column(10,
-                                                     wellPanel("Details 2b (rnaseq info, dna copy, etc)",
-                                                               verbatimTextOutput("zoom_click_info")
-                                                               )
-                                                     )
+                                                     wellPanel(uiOutput("cell_zoom_details")))
                                               )
                                        )
+                                     )
+                            ),
+                            #############################################
+                            ######## POINT DETAIL DISPLAY (Other) #######
+                            #############################################                            
+                            fluidRow(
+                              column(6,
+                                     fluidRow(column(1),
+                                              column(10,
+                                                     wellPanel(verbatimTextOutput("click_info")))
+                                              )
+                                     ),
+                              column(6,
+                                     conditionalPanel(condition = 'output.brushActive != 0',
+                                     fluidRow(column(1),
+                                                 column(10,
+                                                     wellPanel(verbatimTextOutput("zoom_click_info"))
+                                                     )
+                                              )
+                                     )
                                      )
                             ),
                             #####################################
@@ -252,13 +259,17 @@ server <- function(input, output) {
       }
     }) 
     
+    output$cell_details <- renderUI({
+      if(!is.null(input$plot_click)){}
+      printInfo(pnt)
+    })
+    
     #output data associated with the selected point on the left/"zoomed-out" plot
     output$click_info <- renderPrint({
-      if(!is.null(input$plot_click)){
-        #pnt <- nearPoints(defaultplotdata, input$plot_click, maxpoints = 1)
-      }
+      if(!is.null(input$plot_click)){}
       printPoint(pnt)
     })
+    
     
     #output the right/"zoomed-in" plot
     output$plot_zoom<- renderPlot({ 
@@ -298,6 +309,11 @@ server <- function(input, output) {
         }
     }) 
     
+    output$cell_zoom_details <- renderUI({
+      if(!is.null(input$plot_zoom_click)){}
+      printInfo(pnt_zoom)
+    })    
+    
     #output data associated with the selected point on the right/"zoomed-in" plot
     output$zoom_click_info <- renderPrint({
       if(!is.null(input$plot_zoom_click)){
@@ -309,15 +325,17 @@ server <- function(input, output) {
   #################################
   ######## VARIOUS FUNTIONS #######
   #################################
-    
-    printPoint <- function(pnt){
-      underscore <- regexpr("_",rownames(pnt))
-      cell_line <- substring(rownames(pnt), 1, underscore-1)
-      cancer_type <- substring(rownames(pnt), underscore+1)
-      print(paste('Cell Line: ',cell_line))
-      print(paste("Cancer Type: ", cancer_type))
-      print(paste(x_sel, ": ",pnt$x))
-      print(paste(y_sel, ": ",pnt$y))
+    printInfo <- function(point){
+      underscore <- regexpr("_",rownames(point))
+      cell_line <- substring(rownames(point), 1, underscore-1)
+      cancer_type <- substring(rownames(point), underscore+1)
+      str1 <- paste("Cell Line:  ",cell_line)
+      str2 <-paste("Cancer Type:  ", cancer_type)
+      HTML(paste(str1,str2,sep='<br/>'))
+    }
+    printPoint <- function(point){
+      print(paste(x_sel, ": ",point$x))
+      print(paste(y_sel, ": ",point$y))
     }
 
 }

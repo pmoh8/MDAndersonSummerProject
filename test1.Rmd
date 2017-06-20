@@ -33,52 +33,49 @@ ui <-
                    ######## USER CONTROL PANEL (SIDEBAR) ########
                    ##############################################
                      column(3,
-                            wellPanel(
-                              #labels for data selection options
-                              fluidRow(   column(2),   column(5, "x-axis"),   column(5, "y-axis")   ),
-                              #row to select data types to view (such as RNAseq or DNA copy number)
-                              fluidRow(
-                                column(2, "Data"),
-                                #input to select which data type is displayed on the x-axis
-                                column(5,
-                                       selectInput("datatype_x", NULL,c("DNA Copy Number"))
-                                       ),
-                                #input to select which data type is displayed on the y-axis
-                                column(5,
-                                       selectInput("datatype_y", NULL, c("DNA Copy Number"))
-                                       )
+                          wellPanel(
+                        #labels for data selection options
+                          fluidRow(   column(2),   column(5, "x-axis"),   column(5, "y-axis")   ),
+                        #row to select data types to view (such as RNAseq or DNA copy number)
+                          fluidRow(
+                            column(2, "Data"),
+                        #input to select which data type is displayed on the x-axis
+                          column(5,
+                                  selectInput("datatype_x", NULL,c("DNA Copy Number"))
                                 ),
-                              #row to select which gene to view
-                              fluidRow(
-                                column(2,"Gene"),
-                                #input to select which gene is displayed on the x-axis
-                                column(5,
-                                       selectInput("gene_x", NULL,
-                                                   c("A1BG" = "A1BG",
-                                                     "---" = " ",
-                                                     
-                                                     "CDH2" = "CDH2"
-                                                     ))
-                                       ),
-                                #input to select which gene is displayed on the y-axis
-                                column(5,
-                                       selectInput("gene_y", NULL,
-                                                   c("CDH2" = "CDH2",
-                                                     "---" = " ",
-                                                     "A1BG" = "A1BG",
-                                                     "Gene1" = "gene1",
-                                                     "Gene2" = "gene2",
-                                                     "Gene3" = "gene3")))
+                        #input to select which data type is displayed on the y-axis
+                          column(5,
+                                  selectInput("datatype_y", NULL, c("DNA Copy Number"))
                                 )
                               ),
+                        #row to select which gene to view
+                          fluidRow(
+                            column(2,"Gene"),
+                        #input to select which gene is displayed on the x-axis
+                          column(5,
+                            selectInput("gene_x", NULL,
+                                        c("A1BG" = "A1BG",
+                                          "---" = " ",
+                                          "CDH2" = "CDH2"
+                                          ))
+                                        ),
+                        #input to select which gene is displayed on the y-axis
+                          column(5,
+                            selectInput("gene_y", NULL,
+                                        c("CDH2" = "CDH2",
+                                          "---" = " ",
+                                          "A1BG" = "A1BG"
+                                          )))
+                                          )
+                                        ),
                             br(),
-                            "Select a cancer type to highlight",
+                                          "Select a cancer type to highlight",
                             selectInput("variable", NULL,
                                         c("Cancer1" = "cancer1",
                                           "Cancer2" = "cancer2",
                                           "Cancer3" = "cancer3")),
                             checkboxInput("showSelected", "Show selected cancers only?", FALSE)
-                            ),
+                                        ),
                    ##################################################
                    ######## INFORMATION DISPLAY (MAIN PANEL) ########
                    ##################################################

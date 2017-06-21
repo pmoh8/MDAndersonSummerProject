@@ -34,7 +34,6 @@ ui <-
                    ######## USER CONTROL PANEL (SIDEBAR) ########
                    ##############################################
                      column(3,
-<<<<<<< HEAD
                           wellPanel(
                           #labels for data selection options
                           fluidRow(   column(2),   column(5, "x-axis"),   column(5, "y-axis")   ),
@@ -70,8 +69,6 @@ ui <-
                                           )))
                                           )
                                         ),
-=======
->>>>>>> 199be8c7babecc5b1126e2616621f9b6d96d13ec
                             wellPanel(
                               #labels for data selection options
                               fluidRow(   column(2),   column(5, "x-axis"),   column(5, "y-axis")   ),

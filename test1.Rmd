@@ -33,7 +33,6 @@ ui <-
                    ######## USER CONTROL PANEL (SIDEBAR) ########
                    ##############################################
                      column(3,
-<<<<<<< HEAD
                           wellPanel(
                           #labels for data selection options
                           fluidRow(   column(2),   column(5, "x-axis"),   column(5, "y-axis")   ),
@@ -69,7 +68,6 @@ ui <-
                                           )))
                                           )
                                         ),
-=======
                             wellPanel(
                               #labels for data selection options
                               fluidRow(   column(2),   column(5, "x-axis"),   column(5, "y-axis")   ),
@@ -94,7 +92,6 @@ ui <-
                                 column(5, uiOutput("gene_y_selector"))
                                 )
                               ),
->>>>>>> ca6d605902d5c43b29e9b9eb362b1e8b3fddf956
                             br(),
                             "Cancer type(s) to highlight",
                             uiOutput("cancer_selector"),

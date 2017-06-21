@@ -33,6 +33,43 @@ ui <-
                    ######## USER CONTROL PANEL (SIDEBAR) ########
                    ##############################################
                      column(3,
+<<<<<<< HEAD
+                          wellPanel(
+                          #labels for data selection options
+                          fluidRow(   column(2),   column(5, "x-axis"),   column(5, "y-axis")   ),
+                          #row to select data types to view (such as RNAseq or DNA copy number)
+                          fluidRow(
+                            column(2, "Data"),
+                          #input to select which data type is displayed on the x-axis
+                          column(5,
+                                  selectInput("datatype_x", NULL,c("DNA Copy Number"))
+                                ),
+                          #input to select which data type is displayed on the y-axis
+                          column(5,
+                                  selectInput("datatype_y", NULL, c("DNA Copy Number"))
+                                )
+                              ),
+                          #row to select which gene to view
+                          fluidRow(
+                            column(2,"Gene"),
+                          #input to select which gene is displayed on the x-axis
+                          column(5,
+                            selectInput("gene_x", NULL,
+                                        c("A1BG" = "A1BG",
+                                          "---" = " ",
+                                          "CDH2" = "CDH2"
+                                          ))
+                                        ),
+                        #input to select which gene is displayed on the y-axis
+                          column(5,
+                            selectInput("gene_y", NULL,
+                                        c("CDH2" = "CDH2",
+                                          "---" = " ",
+                                          "A1BG" = "A1BG"
+                                          )))
+                                          )
+                                        ),
+=======
                             wellPanel(
                               #labels for data selection options
                               fluidRow(   column(2),   column(5, "x-axis"),   column(5, "y-axis")   ),
@@ -57,6 +94,7 @@ ui <-
                                 column(5, uiOutput("gene_y_selector"))
                                 )
                               ),
+>>>>>>> ca6d605902d5c43b29e9b9eb362b1e8b3fddf956
                             br(),
                             "Cancer type(s) to highlight",
                             uiOutput("cancer_selector"),

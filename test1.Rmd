@@ -8,7 +8,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r, eval = T, echo = F}
+```{r, eval = T, echo = F, fig.width=100}
 library(shiny)
 library(ggplot2)
 source("common2.R")
@@ -34,41 +34,6 @@ ui <-
                    ######## USER CONTROL PANEL (SIDEBAR) ########
                    ##############################################
                      column(3,
-                          wellPanel(
-                          #labels for data selection options
-                          fluidRow(   column(2),   column(5, "x-axis"),   column(5, "y-axis")   ),
-                          #row to select data types to view (such as RNAseq or DNA copy number)
-                          fluidRow(
-                            column(2, "Data"),
-                          #input to select which data type is displayed on the x-axis
-                          column(5,
-                                  selectInput("datatype_x", NULL,c("DNA Copy Number"))
-                                ),
-                          #input to select which data type is displayed on the y-axis
-                          column(5,
-                                  selectInput("datatype_y", NULL, c("DNA Copy Number"))
-                                )
-                              ),
-                          #row to select which gene to view
-                          fluidRow(
-                            column(2,"Gene"),
-                          #input to select which gene is displayed on the x-axis
-                          column(5,
-                            selectInput("gene_x", NULL,
-                                        c("A1BG" = "A1BG",
-                                          "---" = " ",
-                                          "CDH2" = "CDH2"
-                                          ))
-                                        ),
-                        #input to select which gene is displayed on the y-axis
-                          column(5,
-                            selectInput("gene_y", NULL,
-                                        c("CDH2" = "CDH2",
-                                          "---" = " ",
-                                          "A1BG" = "A1BG"
-                                          )))
-                                          )
-                                        ),
                             wellPanel(
                               #labels for data selection options
                               fluidRow(   column(2),   column(5, "x-axis"),   column(5, "y-axis")   ),
@@ -96,7 +61,7 @@ ui <-
                             br(),
                             "Cancer type(s) to highlight",
                             uiOutput("cancer_selector"),
-                            checkboxInput("showSelected", "Show selected cancers only", FALSE),
+                            checkboxInput("showSelectedOnly", "Show selected cancers only", FALSE),
                             textOutput("test")
                             ),
                    ##################################################
@@ -206,11 +171,19 @@ server <- function(input, output) {
     #intialize input parameters
     inputdata_x <- readRDS("CCLE_copynumber_byGene_2013-12-03")
     inputdata_y <- inputdata_x 
-    x_sel <- reactive({return(input$gene_x)})
-    y_sel <- reactive({return(input$gene_y)}) 
-
-    pnt <- NULL
-    pnt_zoom <- NULL
+    x_sel <- reactive({
+      points$pnt <- NULL
+      points$pnt_zoom <- NULL
+      print("clear point")
+      return(input$gene_x)
+      })
+    y_sel <- reactive({
+      points$pnt <- NULL
+      points$pnt_zoom <- NULL
+      print("points")
+      return(input$gene_y)
+      }) 
+    points <- reactiveValues(pnt = NULL, pnt_zoom=NULL)
     
     DNAcopy_options <- reactive({
       return(readRDS("DNAcopy_options_CCLE_copynumber_byGene_2013-12-03"))
@@ -294,23 +267,27 @@ server <- function(input, output) {
         #if the user has the "Show selected cancers only" box checked off, only show the cancers of interest
         defaultplot <<- ggplot() + labs(x = x_sel(), y = y_sel(), title = "Test Scatter") + geom_point(data = highlightDF, aes(x,y, color=cancer), alpha = transpMed) 
         #if the user does not have that option checked, add in the rest of the points, too
-        if(!input$showSelected){
+        if(!input$showSelectedOnly){
           defaultplot <<- defaultplot + geom_point(data = defaultplotdata, aes(x,y), alpha=transp, color=colDefault)
         }
-
         
         #Add the tiny point representing the point selected in the "zoomed-in" plot
-        if(!is.null(pnt_zoom)){
-            defaultplot <<- defaultplot + geom_point(data = pnt_zoom, aes(x,y), color=colOrn, size = ptMed) 
+        if(!is.null(points$pnt_zoom)){
+          defaultplot <<- defaultplot + geom_point(data = points$pnt_zoom, aes(x,y), color=colOrn, size = ptMed) 
         }
         
         #Add user-clicked highlighted points
-        defaultplot <<- plotPointOnClick(defaultplot, input$plot_zoom_click, pnt_zoom, colOrn, ptMed, updatePoint = FALSE)
-        defaultplot <<- plotPointOnClick (defaultplot, input$plot_click, pnt, colRed, ptBig, updatePoint = TRUE)
+        defaultplot <<- plotPointOnClick(defaultplot, input$plot_zoom_click, points$pnt_zoom, colOrn, ptMed, updatePoint = FALSE)
+        defaultplot <<- plotPointOnClick (defaultplot, input$plot_click, points$pnt, colRed, ptBig, updatePoint = TRUE)
         
         #update the stored point of interest if needed
-        if(!(is.null(input$plot_click) && is.null(pnt)) && !is.null(input$plot_click)){
-          pnt <<- nearPoints(defaultplotdata, input$plot_click, maxpoints = 1) 
+        if(!(is.null(input$plot_click) && is.null(points$pnt)) && !is.null(input$plot_click)){
+          if(input$showSelectedOnly){
+            points$pnt <<- nearPoints(highlightDF, input$plot_click, maxpoints = 1) 
+          }
+          else{
+            points$pnt <<- nearPoints(defaultplotdata, input$plot_click, maxpoints = 1)
+          }
         }
         
         #print the plot
@@ -321,13 +298,13 @@ server <- function(input, output) {
     #output details (cell line, cancer type) of the point on the left/"zoomed-out" plot
     output$cell_details <- renderUI({
       if(!is.null(input$plot_click)){}
-      printInfo(pnt)
+      printInfo(points$pnt)
     })
     
     #output data (dna copy number, rnaexpression, etc) associated with the selected point on the left/"zoomed-out" plot 
     output$click_info <- renderTable({
       if(!is.null(input$plot_click)){}
-      printPoint(pnt)
+      printPoint(points$pnt)
       
     },bordered = TRUE, spacing = 'xs', rownames = TRUE,colnames = TRUE)
     
@@ -338,15 +315,15 @@ server <- function(input, output) {
       
       #build the plot
       plotdata$zoomdata <- brushedPoints(defaultplotdata,input$plot_brush)
-      zoomplot<<-ggplot(plotdata$zoomdata, aes(x,y)) + geom_point(alpha=transp, color=colDefault) + geom_point(data = pnt, aes(x,y), color=colRed, size = ptMed) 
+      zoomplot<<-ggplot(plotdata$zoomdata, aes(x,y)) + geom_point(alpha=transp, color=colDefault) + geom_point(data = points$pnt, aes(x,y), color=colRed, size = ptMed) 
       
       #plot the user-click highlighted points
-      zoomplot <- plotPointOnClick(zoomplot, input$plot_click, pnt, colOrn, ptMed, updatePoint = FALSE)
-      zoomplot <- plotPointOnClick (zoomplot, input$plot_zoom_click, pnt_zoom, colRed, ptBig, updatePoint = TRUE)
+      zoomplot <- plotPointOnClick(zoomplot, input$plot_click, points$pnt, colOrn, ptMed, updatePoint = FALSE)
+      zoomplot <- plotPointOnClick (zoomplot, input$plot_zoom_click, points$pnt_zoom, colRed, ptBig, updatePoint = TRUE)
       
       #update the stored point of interest if needed
-      if(!(is.null(input$plot_zoom_click) && is.null(pnt_zoom) ) && !is.null(input$plot_zoom_click)){
-        pnt_zoom <<- nearPoints(defaultplotdata, input$plot_zoom_click, maxpoints = 1)
+      if(!(is.null(input$plot_zoom_click) && is.null(points$pnt_zoom) ) && !is.null(input$plot_zoom_click)){
+        points$pnt_zoom <<- nearPoints(defaultplotdata, input$plot_zoom_click, maxpoints = 1)
       }
       
       #actually output the plot
@@ -356,13 +333,13 @@ server <- function(input, output) {
     #print details (cell line, cancer type) of the selected point on the right/"zoomed-in" plot
     output$cell_zoom_details <- renderUI({
       if(!is.null(input$plot_zoom_click)){}
-      printInfo(pnt_zoom)
+      printInfo(points$pnt_zoom)
     })    
     
     #output data (dna copy number, etc) associated with the selected point on the right/"zoomed-in" plot
     output$zoom_click_info <- renderTable({
       if(!is.null(input$plot_zoom_click)){}
-      printPoint(pnt_zoom)
+      printPoint(points$pnt_zoom)
     },bordered = TRUE, spacing = 'xs', rownames = TRUE,colnames = TRUE)
   
   #################################

@@ -1,0 +1,473 @@
+
+library(shiny)
+library(ggplot2)
+source("common2.R")
+################################################################
+######################## USER INTERFACE ########################
+################################################################
+ui <- 
+  fluidPage( 
+    tags$head(tags$style(HTML("
+                              .selectize-input, .selectize-dropdown {
+                              font-size: 70%;
+                              }
+                              "))),
+    #Set up tabs
+    titlePanel("Cool Application"),
+    
+    sidebarLayout("",
+                  mainPanel(width = 12,
+                            tabsetPanel(
+                              ###########################
+                              ####### SCATTERPLOT #######
+                              ###########################
+                              tabPanel("Scatterplot", 
+                                       br(),
+                                       fluidRow(
+                                         ##############################################
+                                         ######## USER CONTROL PANEL (SIDEBAR) ########
+                                         ##############################################
+                                         column(2,
+                                                wellPanel(
+                                                  #labels for data selection options
+                                                  fluidRow(   column(2),   column(5, "x-axis"),   column(5, "y-axis")   ),
+                                                  #row to select data types to view (such as RNAseq or DNA copy number)
+                                                  fluidRow(
+                                                    column(2, "Data"),
+                                                    #input to select which data type is displayed on the x-axis
+                                                    column(5,
+                                                           selectInput("datatype_x", NULL,c("DNA Copy Number"))
+                                                    ),
+                                                    #input to select which data type is displayed on the y-axis
+                                                    column(5,
+                                                           selectInput("datatype_y", NULL, c("DNA Copy Number"))
+                                                    )
+                                                  ),
+                                                  #row to select which gene to view
+                                                  fluidRow(
+                                                    column(2,"Gene"),
+                                                    #input to select which gene is displayed on the x-axis
+                                                    column(5, uiOutput("gene_x_selector")),
+                                                    #input to select which gene is displayed on the y-axis
+                                                    column(5, uiOutput("gene_y_selector"))
+                                                  )
+                                                ),
+                                                br(),
+                                                "Cancer type(s) to highlight",
+                                                uiOutput("cancer_selector"),
+                                                checkboxInput("showSelectedOnly", "Show selected cancers only", FALSE),
+                                                textOutput("test")
+                                         ),
+                                         ##################################################
+                                         ######## INFORMATION DISPLAY (MAIN PANEL) ########
+                                         ##################################################
+                                         column(8,
+                                                ##############################################################
+                                                ######## POINT DETAIL DISPLAY (Cell line, Cancer Type) #######
+                                                ##############################################################
+                                                fluidRow(
+                                                  #display details of the left plot ("zoomed-out" plot)
+                                                  column(6, 
+                                                         #display details
+                                                         fluidRow(column(1),
+                                                                  column(10, wellPanel(uiOutput("cell_details")))
+                                                         )
+                                                  ),
+                                                  #display details of the right plot ("zoomed-in" plot)
+                                                  column(6,
+                                                         #only display IF the user has selected a potion of the left plot
+                                                         conditionalPanel(condition = 'output.brushActive != 0',
+                                                                          fluidRow(column(1),
+                                                                                   column(10, wellPanel(uiOutput("cell_zoom_details")))
+                                                                          )
+                                                         )
+                                                  )
+                                                ),
+                                                #############################################
+                                                ######## POINT DETAIL DISPLAY (Other) #######
+                                                #############################################                            
+                                                fluidRow(
+                                                  column(6,
+                                                         fluidRow(column(1),
+                                                                  column(10, wellPanel(tableOutput("click_info")))
+                                                         )
+                                                  ),
+                                                  column(6,
+                                                         conditionalPanel(condition = 'output.brushActive != 0',
+                                                                          fluidRow(column(1),
+                                                                                   column(10, wellPanel(tableOutput("zoom_click_info")))
+                                                                          )
+                                                         )
+                                                  )
+                                                ),
+                                                #####################################
+                                                ######## SCATTERPLOT DISPLAY ########
+                                                #####################################
+                                                fluidRow(
+                                                  #Display left ("zoomed-out") scatterplot
+                                                  column(6,
+                                                         wellPanel(
+                                                           plotOutput("plot",
+                                                                      click = "plot_click",
+                                                                      brush = brushOpts(id="plot_brush")
+                                                           )
+                                                         )
+                                                  ),
+                                                  #Display right ("zoomed-in") scatterplot
+                                                  column(6,
+                                                         #only display IF the user has selected a potion of the left plot
+                                                         conditionalPanel(condition = 'output.brushActive != 0',
+                                                                          wellPanel(
+                                                                            plotOutput("plot_zoom",
+                                                                                       click = "plot_zoom_click"))
+                                                         )
+                                                  )
+                                                )
+                                         ),
+                                         ##############################################
+                                         ######## USER CONTROL PANEL (SIDEBAR) ########
+                                         ##############################################
+                                         column(2,
+                                                conditionalPanel(condition = 'output.brushActive != 0',
+                                                                 wellPanel(
+                                                                   #labels for data selection options
+                                                                   fluidRow(   column(2),   column(5, "x-axis"),   column(5, "y-axis")   ),
+                                                                   #row to select data types to view (such as RNAseq or DNA copy number)
+                                                                   fluidRow(
+                                                                     column(2, "Data"),
+                                                                     #input to select which data type is displayed on the x-axis
+                                                                     column(5,
+                                                                            selectInput("datatype_zoom_x", NULL,c("DNA Copy Number"))
+                                                                     ),
+                                                                     #input to select which data type is displayed on the y-axis
+                                                                     column(5,
+                                                                            selectInput("datatype_zoom_y", NULL, c("DNA Copy Number"))
+                                                                     )
+                                                                   ),
+                                                                   #row to select which gene to view
+                                                                   fluidRow(
+                                                                     column(2,"Gene"),
+                                                                     #input to select which gene is displayed on the x-axis
+                                                                     column(5, uiOutput("gene_zoom_x_selector")),
+                                                                     #input to select which gene is displayed on the y-axis
+                                                                     column(5, uiOutput("gene_zoom_y_selector"))
+                                                                   )
+                                                                 )
+                                                )
+                                         )
+                                       )
+                              ),
+                              #######################
+                              ####### HEATMAP #######
+                              #######################   
+                              tabPanel("Heatmap", verbatimTextOutput("summary"))
+                            )
+                  )
+    )
+    )
+########################################################
+######################## SERVER ########################
+########################################################
+server <- function(input, output, session) {
+  
+  #BEGIN TEST VALUES
+  x <- rnorm(500)
+  y <- rnorm(500)
+  testdata <- data.frame(x = x, y = y)
+  plotdata <- reactiveValues(zoomdata=(NULL))
+  #END TEST VALUES
+  
+  ###############################
+  ######## GENERAL SETUP ########
+  ############################### 
+  
+  #Set up some aesthetics
+  cbPalette <- c("#009E73", "#F0E442", "#0072B2", "#CC79A7","#56B4E9")
+  
+  ptBig = 5
+  ptMed = 3
+  transp = 0.3
+  transpMed = 0.7
+  colDefault = "#999999"
+  colRed = "#D55E00"
+  colOrn = "#E69F00"
+  
+  #intialize input parameters
+  points <- reactiveValues(pnt = NULL, pnt_zoom=NULL)
+  inputdata_x <- readRDS("CCLE_copynumber_byGene_2013-12-03")
+  inputdata_y <- inputdata_x 
+  x_sel <- reactive({
+    clearPoints()
+    return(input$gene_x)
+  })
+  y_sel <- reactive({
+    clearPoints()
+    return(input$gene_y)
+  }) 
+  x_datatype <- reactive({return(input$datatype_x)})
+  y_datatype <- reactive({return(input$datatype_y)})
+  x_zoom_sel <- reactive({
+    points$pnt_zoom <- NULL
+    return(input$gene_zoom_x)
+  })
+  y_zoom_sel <- reactive({
+    points$pnt_zoom <- NULL
+    return(input$gene_zoom_y)
+  })
+  # x_zoom_datatype
+  # y_zoom_datatype
+  
+  DNAcopy_options <- reactive({
+    return(readRDS("DNAcopy_options_CCLE_copynumber_byGene_2013-12-03"))
+  })
+  
+  cancer_options <- readRDS("cancerTypes_CCLE_copynumber_byGene_2013-12-03")
+  cancer_highlights <- reactive({
+    return(input$cancer_selection)
+  })
+  
+  ###################################
+  ######## CHECK EVENT FLAGS ########
+  ###################################
+  #values for event flags
+  flags <- reactiveValues(brushActive = 0)
+  output$brushActive <- reactive({ return(flags$brushActive) })
+  outputOptions(output, name = "brushActive", suspendWhenHidden = FALSE)
+  
+  #Check to see if the brush is active
+  observeEvent(plotdata$zoomdata, {
+    if(is.data.frame(plotdata$zoomdata) && nrow(plotdata$zoomdata)==0) {
+      flags$brushActive <- 0
+      flags$defaultZoomView <- 1
+      print("brush is not active")
+    }
+    else{
+      if(flags$brushActive == 0){
+        flags$defaultZoomView <- 0
+        updateSelectInput(session, "gene_zoom_x",selected=x_sel())
+        updateSelectInput(session, "gene_zoom_y",selected=y_sel())
+        print("next zoom will be default")
+      }
+      flags$brushActive <- 1
+      print("brush is active!")
+    }
+  })
+  #If the user has selected data points with the brush, save them to the reactiveValue "zoomdata"
+  observeEvent(input$plot_brush,{plotdata$zoomdata <- brushedPoints(testdata,input$plot_brush)})
+  
+  #######################################
+  ####### RENDERING USER OPTIONS ########
+  #######################################
+  #Test render
+  output$test <- renderText({
+    #cancer_highlights()
+  })
+  
+  #Actual rendering
+  output$cancer_selector <- renderUI({
+    selectInput("cancer_selection", NULL, cancer_options, multiple = TRUE)
+  })
+  output$gene_x_selector <- renderUI({
+    selectInput("gene_x", NULL, DNAcopy_options())
+  })
+  output$gene_y_selector <- renderUI({
+    selectInput("gene_y", NULL, DNAcopy_options())
+  })
+  output$gene_zoom_x_selector <- renderUI({
+    y_sel()
+    return(selectInput("gene_zoom_x", NULL, DNAcopy_options(),selected=x_sel()))
+  })
+  output$gene_zoom_y_selector <- renderUI({
+    x_sel()
+    return(selectInput("gene_zoom_y", NULL, DNAcopy_options(),selected=y_sel()))
+  })
+  
+  ##################################
+  ####### RENDERING OUTPUTS ########
+  ##################################
+  
+  #output the left/"zoomed-out" plot
+  output$plot<- renderPlot({ 
+    
+    #Select the appropriate rows from our database table based on user input
+    if(TRUE){
+      #Get the x and y values of interest and save them to a data frame
+      x <- sapply(inputdata_x[inputdata_x[,"SYMBOL"]==x_sel(),-c(1:5)], as.numeric)
+      y <- sapply(inputdata_y[inputdata_y[,"SYMBOL"]==y_sel(),-c(1:5)], as.numeric)
+      
+      #make the dataframe to hold the information we're displaying in the scatterplot
+      defaultplotdata <<- data.frame(x = x, y = y)
+      
+      #make columns for cancer type and cell line name
+      underscore <- regexpr("_",rownames(defaultplotdata))
+      cell_line <- substring(rownames(defaultplotdata), 1, underscore-1)
+      cancer_type <- substring(rownames(defaultplotdata), underscore+1)
+      cancer = cancer_type
+      line = cell_line
+      defaultplotdata <<- cbind(defaultplotdata,cancer)
+      defaultplotdata <<- cbind(defaultplotdata,line)
+      
+      #make a dataframe to hold the cancer cell lines the user wants to highlight (based on cancer type)
+      highlightDF <<- defaultplotdata[defaultplotdata$cancer %in% cancer_highlights(),]
+      
+      #Create our plot
+      #if the user has the "Show selected cancers only" box checked off, only show the cancers of interest
+      defaultplot <<- ggplot() + labs(x = paste(x_sel()," - ",x_datatype()), y = paste(y_sel()," - ",y_datatype()), title = "Test Scatter")
+      #if the user does not have that option checked, add in the rest of the points, too
+      if(!input$showSelectedOnly){
+        defaultplot <<- defaultplot + geom_point(data = defaultplotdata, aes(x,y), alpha=transp, color=colDefault)
+      }
+      defaultplot <<- defaultplot + geom_point(data = highlightDF, aes(x,y, color=cancer), alpha = transpMed) + scale_colour_manual(values=cbPalette)
+      #Add the tiny point representing the point selected in the "zoomed-in" plot
+      if(!is.null(points$pnt_zoom) && (flags$brushActive != 0)){
+        matched_pnt_zoom <- defaultplotdata[row.names(points$pnt_zoom),]
+        print("matched point")
+        print(matched_pnt_zoom)
+        print("---")
+        defaultplot <<- plotPointOnClick(defaultplot, input$plot_zoom_click, matched_pnt_zoom, colOrn, ptMed, updatePoint = FALSE)
+      }
+      
+      #Add user-clicked highlighted points
+      defaultplot <<- plotPointOnClick (defaultplot, input$plot_click, points$pnt, colRed, ptBig, updatePoint = TRUE)
+      
+      #update the stored point of interest if needed
+      if(!(is.null(input$plot_click) && is.null(points$pnt)) && !is.null(input$plot_click)){
+        if(input$showSelectedOnly){
+          points$pnt <<- nearPoints(highlightDF, input$plot_click, maxpoints = 1) 
+        }
+        else{
+          points$pnt <<- nearPoints(defaultplotdata, input$plot_click, maxpoints = 1)
+        }
+      }
+      
+      #print the plot
+      defaultplot
+    }
+  }) 
+  
+  #output details (cell line, cancer type) of the point on the left/"zoomed-out" plot
+  output$cell_details <- renderUI({
+    if(!is.null(input$plot_click)){}
+    printInfo(points$pnt)
+  })
+  
+  #output data (dna copy number, rnaexpression, etc) associated with the selected point on the left/"zoomed-out" plot 
+  output$click_info <- renderTable({
+    if(!is.null(input$plot_click)){}
+    printPoint(points$pnt,x_sel(),y_sel())
+    
+  },bordered = TRUE, spacing = 'xs', rownames = TRUE,colnames = TRUE)
+  
+  
+  #output the right/"zoomed-in" plot
+  output$plot_zoom<- renderPlot({
+    if(flags$brushActive != 0){
+      print("zoom")
+      
+      #build the plot
+      plotdata$zoomdata <- brushedPoints(defaultplotdata,input$plot_brush)
+      plottingdata<-plotdata$zoomdata
+      if(flags$defaultZoomView==0){
+        #Get the x and y values of interest and save them to a data frame
+        x <- sapply(inputdata_x[inputdata_x[,"SYMBOL"]==x_zoom_sel(),-c(1:5)], as.numeric)
+        y <- sapply(inputdata_y[inputdata_y[,"SYMBOL"]==y_zoom_sel(),-c(1:5)], as.numeric)
+        #make the dataframe to hold the information we're displaying in the scatterplot
+        cancersOfInterest <- row.names(plotdata$zoomdata)
+        
+        newDF <<- data.frame(x = x, y = y)[cancersOfInterest,]
+        #make columns for cancer type and cell line name
+        underscore <- regexpr("_",rownames(plotdata$zoomdata))
+        cell_line <- substring(rownames(plotdata$zoomdata), 1, underscore-1)
+        cancer_type <- substring(rownames(plotdata$zoomdata), underscore+1)
+        cancer = cancer_type
+        line = cell_line
+        newDF <<- cbind(newDF, cancer)
+        newDF <<- cbind(newDF,line)
+        plottingdata<-newDF
+      }
+      highlightzoomDF <<- plottingdata[plottingdata$cancer %in% cancer_highlights(),]
+      
+      #if the user has the "Show selected cancers only" box checked off, only show the cancers of interest
+      zoomplot<<-ggplot() + labs(x = paste(x_zoom_sel()," - ", x_datatype()), y = paste(y_zoom_sel()," - ",y_datatype()), title = "Test Scatter") 
+      #if the user does not have that option checked, add in the rest of the points, too
+      if(!input$showSelectedOnly){
+        zoomplot <<- zoomplot + geom_point(data = plottingdata, aes(x,y), alpha=transp, color=colDefault)
+      }
+      zoomplot <<- zoomplot + geom_point(data = highlightzoomDF, aes(x,y, color=cancer), alpha = transpMed) + scale_colour_manual(values=cbPalette)      
+      #plot the user-click highlighted points
+      matched_pnt <- plottingdata[row.names(points$pnt),]
+      zoomplot <- plotPointOnClick(zoomplot, input$plot_click, matched_pnt, colRed, ptMed, updatePoint = FALSE)
+      zoomplot <- plotPointOnClick (zoomplot, input$plot_zoom_click, points$pnt_zoom, colOrn, ptBig, updatePoint = TRUE)
+      
+      #update the stored point of interest if needed
+      if(!(is.null(input$plot_zoom_click) && is.null(points$pnt_zoom) ) && !is.null(input$plot_zoom_click)){
+        if(input$showSelectedOnly){
+          points$pnt_zoom <<- nearPoints(highlightzoomDF, input$plot_zoom_click, maxpoints = 1) 
+        }
+        else{
+          points$pnt_zoom <<- nearPoints(plottingdata, input$plot_zoom_click, maxpoints = 1)
+        }
+      }
+      
+      #actually output the plot
+      zoomplot
+    }
+  }) 
+  
+  #print details (cell line, cancer type) of the selected point on the right/"zoomed-in" plot
+  output$cell_zoom_details <- renderUI({
+    if(!is.null(input$plot_zoom_click)){}
+    printInfo(points$pnt_zoom)
+  })    
+  
+  #output data (dna copy number, etc) associated with the selected point on the right/"zoomed-in" plot
+  output$zoom_click_info <- renderTable({
+    if(!is.null(input$plot_zoom_click)){}
+    printPoint(points$pnt_zoom,x_zoom_sel(),y_zoom_sel())
+  },bordered = TRUE, spacing = 'xs', rownames = TRUE,colnames = TRUE)
+  
+  #################################
+  ######## VARIOUS FUNTIONS #######
+  #################################
+  plotPointOnClick <- function(plot,inputClick,point,ptColor, ptSize, updatePoint){
+    plotPoint <- point
+    if(is.null(inputClick) && is.null(plotPoint)){
+      plot
+    }
+    else{ 
+      if(!is.null(inputClick) && (updatePoint == TRUE)){
+        plotPoint <- nearPoints(defaultplotdata, inputClick, maxpoints = 1)
+      }
+      plot<-plot + geom_point(data = plotPoint, aes(x,y), color = ptColor, size = ptSize, shape = 17)
+    }
+    return (plot)
+  }
+  printInfo <- function(point){
+    print(point)
+    str1 <- paste("Cell Line:  ", point$line)
+    str2 <-paste("Cancer Type:  ", point$cancer)
+    HTML(paste(str1,str2,sep='<br/>'))
+  }
+  printPoint <- function(point,x_axis,y_axis){
+    if(is.data.frame(point) && nrow(point)!=0) {
+      if(x_axis != y_axis){
+        pointDetail <- data.frame(c(point$x, point$y))
+        row.names(pointDetail)<-c(x_axis,y_axis)
+      }
+      else{
+        pointDetail <- data.frame(c(point$x))
+        row.names(pointDetail)<-c(x_axis) 
+      }
+      names(pointDetail)<-c("DNA Copy #")
+      return (pointDetail)
+    }
+  }
+  clearPoints <- function(){
+    points$pnt <- NULL
+    points$pnt_zoom <- NULL
+  }
+  
+}
+
+shinyApp(ui = ui, server = server)
+

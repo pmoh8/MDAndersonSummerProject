@@ -119,7 +119,9 @@ ui <-
                                                          conditionalPanel(condition = 'output.brushActive != 0',
                                                                           wellPanel(
                                                                             plotOutput("plot_zoom",
-                                                                                       click = "plot_zoom_click"))
+                                                                                       click = "plot_zoom_click")),
+                                                                          actionButton("show_zoom_table","Show Data"),
+                                                                          tableOutput("zoom_table")
                                                          )
                                                   )
                                                 )
@@ -194,6 +196,8 @@ server <- function(input, output, session) {
   
   #intialize input parameters
   points <- reactiveValues(pnt = NULL, pnt_zoom=NULL)
+  
+  #for the left plot
   inputdata_x <- readRDS("CCLE_copynumber_byGene_2013-12-03")
   inputdata_y <- inputdata_x 
   x_sel <- reactive({
@@ -206,6 +210,8 @@ server <- function(input, output, session) {
   }) 
   x_datatype <- reactive({return(input$datatype_x)})
   y_datatype <- reactive({return(input$datatype_y)})
+  
+  #For the right plot
   x_zoom_sel <- reactive({
     points$pnt_zoom <- NULL
     return(input$gene_zoom_x)
@@ -244,9 +250,10 @@ server <- function(input, output, session) {
     else{
       if(flags$brushActive == 0){
         flags$defaultZoomView <- 0
+        #Reset the selectinput options on the right/"zoomed-in" control panel
         updateSelectInput(session, "gene_zoom_x",selected=x_sel())
         updateSelectInput(session, "gene_zoom_y",selected=y_sel())
-        print("next zoom will be default")
+        print("zoom plot has been reset to default")
       }
       flags$brushActive <- 1
       print("brush is active!")
@@ -254,13 +261,17 @@ server <- function(input, output, session) {
   })
   #If the user has selected data points with the brush, save them to the reactiveValue "zoomdata"
   observeEvent(input$plot_brush,{plotdata$zoomdata <- brushedPoints(testdata,input$plot_brush)})
-  
+  #Show tables with the values displayed on the scatterplots
+  observeEvent(input$show_zoom_table,{
+    output$zoom_table <- renderTable({
+      return(plottingdata[,1:2])
+    },bordered = TRUE, spacing = 'xs', rownames = TRUE,colnames = TRUE)
+  })
   #######################################
   ####### RENDERING USER OPTIONS ########
   #######################################
   #Test render
   output$test <- renderText({
-    #cancer_highlights()
   })
   
   #Actual rendering
@@ -318,9 +329,11 @@ server <- function(input, output, session) {
         defaultplot <<- defaultplot + geom_point(data = defaultplotdata, aes(x,y), alpha=transp, color=colDefault)
       }
       defaultplot <<- defaultplot + geom_point(data = highlightDF, aes(x,y, color=cancer), alpha = transpMed) + scale_colour_manual(values=cbPalette)
+      
       #Add the tiny point representing the point selected in the "zoomed-in" plot
       if(!is.null(points$pnt_zoom) && (flags$brushActive != 0)){
-        matched_pnt_zoom <- defaultplotdata[row.names(points$pnt_zoom),]
+        matched_pnt_zoom <- updatePoint(points$pnt_zoom,defaultplotdata)
+          #defaultplotdata[row.names(points$pnt_zoom),]
         print("matched point")
         print(matched_pnt_zoom)
         print("---")
@@ -366,7 +379,7 @@ server <- function(input, output, session) {
       
       #build the plot
       plotdata$zoomdata <- brushedPoints(defaultplotdata,input$plot_brush)
-      plottingdata<-plotdata$zoomdata
+      plottingdata<<-plotdata$zoomdata
       if(flags$defaultZoomView==0){
         #Get the x and y values of interest and save them to a data frame
         x <- sapply(inputdata_x[inputdata_x[,"SYMBOL"]==x_zoom_sel(),-c(1:5)], as.numeric)
@@ -383,7 +396,7 @@ server <- function(input, output, session) {
         line = cell_line
         newDF <<- cbind(newDF, cancer)
         newDF <<- cbind(newDF,line)
-        plottingdata<-newDF
+        plottingdata<<-newDF
       }
       highlightzoomDF <<- plottingdata[plottingdata$cancer %in% cancer_highlights(),]
       
@@ -395,7 +408,8 @@ server <- function(input, output, session) {
       }
       zoomplot <<- zoomplot + geom_point(data = highlightzoomDF, aes(x,y, color=cancer), alpha = transpMed) + scale_colour_manual(values=cbPalette)      
       #plot the user-click highlighted points
-      matched_pnt <- plottingdata[row.names(points$pnt),]
+      matched_pnt <- updatePoint(points$pnt,plottingdata)
+        #plottingdata[row.names(points$pnt),]
       zoomplot <- plotPointOnClick(zoomplot, input$plot_click, matched_pnt, colRed, ptMed, updatePoint = FALSE)
       zoomplot <- plotPointOnClick (zoomplot, input$plot_zoom_click, points$pnt_zoom, colOrn, ptBig, updatePoint = TRUE)
       
@@ -429,6 +443,8 @@ server <- function(input, output, session) {
   #################################
   ######## VARIOUS FUNTIONS #######
   #################################
+  
+  #Add a highlighted point to the passed in plot
   plotPointOnClick <- function(plot,inputClick,point,ptColor, ptSize, updatePoint){
     plotPoint <- point
     if(is.null(inputClick) && is.null(plotPoint)){
@@ -442,12 +458,16 @@ server <- function(input, output, session) {
     }
     return (plot)
   }
+  
+  #Print the cancer line and cancer type associated with the passed in point
   printInfo <- function(point){
     print(point)
     str1 <- paste("Cell Line:  ", point$line)
     str2 <-paste("Cancer Type:  ", point$cancer)
     HTML(paste(str1,str2,sep='<br/>'))
   }
+  
+  #Print data associated with the point (such as DNA copy number, mRNA, etc)
   printPoint <- function(point,x_axis,y_axis){
     if(is.data.frame(point) && nrow(point)!=0) {
       if(x_axis != y_axis){
@@ -462,9 +482,14 @@ server <- function(input, output, session) {
       return (pointDetail)
     }
   }
+  
+  #Reset the values of the stored points to NULL
   clearPoints <- function(){
     points$pnt <- NULL
     points$pnt_zoom <- NULL
+  }
+  updatePoint <- function(point, data){
+    return(data[row.names(point),])
   }
   
 }

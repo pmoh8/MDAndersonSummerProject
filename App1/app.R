@@ -1,5 +1,6 @@
 
 library(shiny)
+library(DT)
 library(ggplot2)
 source("common2.R")
 ################################################################
@@ -120,8 +121,16 @@ ui <-
                                                                           wellPanel(
                                                                             plotOutput("plot_zoom",
                                                                                        click = "plot_zoom_click")),
-                                                                          actionButton("show_zoom_table","Show Data"),
-                                                                          tableOutput("zoom_table")
+                                                                          #Allow user to toggle whether ot not they want to see a table with the plotted data
+                                                                          conditionalPanel(condition ='!output.showZoomTable',
+                                                                                           actionButton("show_zoom_table","Show Data")
+                                                                                           ),
+                                                                          conditionalPanel(condition = 'output.showZoomTable',
+                                                                                           actionButton("hide_zoom_table","Hide Data"),
+                                                                                           br(),
+                                                                                           br(),
+                                                                                           DT::dataTableOutput("zoom_table")
+                                                                                           )
                                                          )
                                                   )
                                                 )
@@ -188,16 +197,17 @@ server <- function(input, output, session) {
   
   ptBig = 5
   ptMed = 3
+  ptSmol = 2
   transp = 0.3
   transpMed = 0.7
   colDefault = "#999999"
   colRed = "#D55E00"
   colOrn = "#E69F00"
   
-  #intialize input parameters
+  #intialize reactive values for points the user can choose to highlight by clicking on each plot
   points <- reactiveValues(pnt = NULL, pnt_zoom=NULL)
   
-  #for the left plot
+  #for the left ("zoomed"-out") plot
   inputdata_x <- readRDS("CCLE_copynumber_byGene_2013-12-03")
   inputdata_y <- inputdata_x 
   x_sel <- reactive({
@@ -211,7 +221,7 @@ server <- function(input, output, session) {
   x_datatype <- reactive({return(input$datatype_x)})
   y_datatype <- reactive({return(input$datatype_y)})
   
-  #For the right plot
+  #For the right ("zoomed-in") plot
   x_zoom_sel <- reactive({
     points$pnt_zoom <- NULL
     return(input$gene_zoom_x)
@@ -223,11 +233,14 @@ server <- function(input, output, session) {
   # x_zoom_datatype
   # y_zoom_datatype
   
+  #Read in the selection options for x_sel, y_sel, x_zoom_sel, and y_zoom_sel
   DNAcopy_options <- reactive({
     return(readRDS("DNAcopy_options_CCLE_copynumber_byGene_2013-12-03"))
   })
   
+  #Read in the options for the user to select and highlight specific cancer type(s)
   cancer_options <- readRDS("cancerTypes_CCLE_copynumber_byGene_2013-12-03")
+  #Holds the list of cancer types the user has selected to highlight
   cancer_highlights <- reactive({
     return(input$cancer_selection)
   })
@@ -236,9 +249,11 @@ server <- function(input, output, session) {
   ######## CHECK EVENT FLAGS ########
   ###################################
   #values for event flags
-  flags <- reactiveValues(brushActive = 0)
+  flags <- reactiveValues(brushActive = 0, showZoomTable = FALSE)
   output$brushActive <- reactive({ return(flags$brushActive) })
+  output$showZoomTable <- reactive({ return(flags$showZoomTable)})
   outputOptions(output, name = "brushActive", suspendWhenHidden = FALSE)
+  outputOptions(output, name = "showZoomTable", suspendWhenHidden = FALSE)
   
   #Check to see if the brush is active
   observeEvent(plotdata$zoomdata, {
@@ -261,12 +276,29 @@ server <- function(input, output, session) {
   })
   #If the user has selected data points with the brush, save them to the reactiveValue "zoomdata"
   observeEvent(input$plot_brush,{plotdata$zoomdata <- brushedPoints(testdata,input$plot_brush)})
-  #Show tables with the values displayed on the scatterplots
+  
+  #Observe whether the user has decided to toggle the data table on the right/"zoomed-in" plot for viewing
   observeEvent(input$show_zoom_table,{
-    output$zoom_table <- renderTable({
-      return(plottingdata[,1:2])
-    },bordered = TRUE, spacing = 'xs', rownames = TRUE,colnames = TRUE)
+    flags$showZoomTable <- TRUE
+    print("zoomtable = true")
+    print(flags$showZoomTable)
+    makeZoomTable(plottingdata,x_zoom_sel(),y_zoom_sel())
   })
+  observeEvent(input$hide_zoom_table,{
+    flags$showZoomTable <- FALSE
+    print("zoomtable = false")
+    print(flags$showZoomTable)
+  })
+  
+  #If appropriate, make the table to display the data in the right/"zoomed-in" plot
+  makeZoomTable <- function(data,x_axis,y_axis){
+    if(flags$showZoomTable){
+      output$zoom_table <- DT::renderDataTable({
+        displayTable <- datatable(data[,1:2],colnames = c(x_axis,y_axis))
+        return(displayTable)
+      })
+    }
+  }
   #######################################
   ####### RENDERING USER OPTIONS ########
   #######################################
@@ -311,32 +343,26 @@ server <- function(input, output, session) {
       
       #make columns for cancer type and cell line name
       underscore <- regexpr("_",rownames(defaultplotdata))
-      cell_line <- substring(rownames(defaultplotdata), 1, underscore-1)
-      cancer_type <- substring(rownames(defaultplotdata), underscore+1)
-      cancer = cancer_type
-      line = cell_line
+      line <- substring(rownames(defaultplotdata), 1, underscore-1)
+      cancer <- substring(rownames(defaultplotdata), underscore+1)
       defaultplotdata <<- cbind(defaultplotdata,cancer)
       defaultplotdata <<- cbind(defaultplotdata,line)
       
-      #make a dataframe to hold the cancer cell lines the user wants to highlight (based on cancer type)
-      highlightDF <<- defaultplotdata[defaultplotdata$cancer %in% cancer_highlights(),]
-      
-      #Create our plot
       #if the user has the "Show selected cancers only" box checked off, only show the cancers of interest
       defaultplot <<- ggplot() + labs(x = paste(x_sel()," - ",x_datatype()), y = paste(y_sel()," - ",y_datatype()), title = "Test Scatter")
+      
       #if the user does not have that option checked, add in the rest of the points, too
       if(!input$showSelectedOnly){
         defaultplot <<- defaultplot + geom_point(data = defaultplotdata, aes(x,y), alpha=transp, color=colDefault)
       }
+      
+      #make a dataframe to hold the cancer cell lines the user wants to highlight (based on cancer type)
+      highlightDF <<- defaultplotdata[defaultplotdata$cancer %in% cancer_highlights(),]
       defaultplot <<- defaultplot + geom_point(data = highlightDF, aes(x,y, color=cancer), alpha = transpMed) + scale_colour_manual(values=cbPalette)
       
-      #Add the tiny point representing the point selected in the "zoomed-in" plot
+      #Add the tiny point representing the point selected in the other ("zoomed-in") plot
       if(!is.null(points$pnt_zoom) && (flags$brushActive != 0)){
         matched_pnt_zoom <- updatePoint(points$pnt_zoom,defaultplotdata)
-          #defaultplotdata[row.names(points$pnt_zoom),]
-        print("matched point")
-        print(matched_pnt_zoom)
-        print("---")
         defaultplot <<- plotPointOnClick(defaultplot, input$plot_zoom_click, matched_pnt_zoom, colOrn, ptMed, updatePoint = FALSE)
       }
       
@@ -368,18 +394,21 @@ server <- function(input, output, session) {
   output$click_info <- renderTable({
     if(!is.null(input$plot_click)){}
     printPoint(points$pnt,x_sel(),y_sel())
-    
   },bordered = TRUE, spacing = 'xs', rownames = TRUE,colnames = TRUE)
   
   
   #output the right/"zoomed-in" plot
   output$plot_zoom<- renderPlot({
     if(flags$brushActive != 0){
-      print("zoom")
       
       #build the plot
+      #Get selected points from the left/"zoomed-out" plot and save them
       plotdata$zoomdata <- brushedPoints(defaultplotdata,input$plot_brush)
+      oldplottingdata <<- plottingdata
       plottingdata<<-plotdata$zoomdata
+      
+      #Perform manipulations on the selected data points from the previous block of code based on user input
+      
       if(flags$defaultZoomView==0){
         #Get the x and y values of interest and save them to a data frame
         x <- sapply(inputdata_x[inputdata_x[,"SYMBOL"]==x_zoom_sel(),-c(1:5)], as.numeric)
@@ -390,26 +419,38 @@ server <- function(input, output, session) {
         newDF <<- data.frame(x = x, y = y)[cancersOfInterest,]
         #make columns for cancer type and cell line name
         underscore <- regexpr("_",rownames(plotdata$zoomdata))
-        cell_line <- substring(rownames(plotdata$zoomdata), 1, underscore-1)
-        cancer_type <- substring(rownames(plotdata$zoomdata), underscore+1)
-        cancer = cancer_type
-        line = cell_line
-        newDF <<- cbind(newDF, cancer)
-        newDF <<- cbind(newDF,line)
+        line <- substring(rownames(plotdata$zoomdata), 1, underscore-1)
+        cancer <- substring(rownames(plotdata$zoomdata), underscore+1)
+        newDF <- cbind(newDF, cancer)
+        newDF <- cbind(newDF,line)
         plottingdata<<-newDF
+        
+        #Determine if the new plotting dataset and the old one are the same or not.  If they are different, re-rendeer the displayed data table
+        if(!isTRUE(all.equal(plottingdata,oldplottingdata))){
+          makeZoomTable(plottingdata,x_zoom_sel(),y_zoom_sel())
+        }
       }
-      highlightzoomDF <<- plottingdata[plottingdata$cancer %in% cancer_highlights(),]
       
       #if the user has the "Show selected cancers only" box checked off, only show the cancers of interest
       zoomplot<<-ggplot() + labs(x = paste(x_zoom_sel()," - ", x_datatype()), y = paste(y_zoom_sel()," - ",y_datatype()), title = "Test Scatter") 
+      
       #if the user does not have that option checked, add in the rest of the points, too
       if(!input$showSelectedOnly){
         zoomplot <<- zoomplot + geom_point(data = plottingdata, aes(x,y), alpha=transp, color=colDefault)
       }
+      #Add in highlighted cancer types
+      highlightzoomDF <<- plottingdata[plottingdata$cancer %in% cancer_highlights(),]
       zoomplot <<- zoomplot + geom_point(data = highlightzoomDF, aes(x,y, color=cancer), alpha = transpMed) + scale_colour_manual(values=cbPalette)      
+      
+      #Add in user-selected highlights from the printed data table
+      tableHighlights = input$zoom_table_rows_selected
+      print(tableHighlights)
+      if(length(tableHighlights)){
+        zoomplot <<- zoomplot + geom_point(data = plottingdata[tableHighlights,], aes(x,y), color=colOrn, size = ptSmol)
+      }
+      
       #plot the user-click highlighted points
       matched_pnt <- updatePoint(points$pnt,plottingdata)
-        #plottingdata[row.names(points$pnt),]
       zoomplot <- plotPointOnClick(zoomplot, input$plot_click, matched_pnt, colRed, ptMed, updatePoint = FALSE)
       zoomplot <- plotPointOnClick (zoomplot, input$plot_zoom_click, points$pnt_zoom, colOrn, ptBig, updatePoint = TRUE)
       
@@ -488,6 +529,8 @@ server <- function(input, output, session) {
     points$pnt <- NULL
     points$pnt_zoom <- NULL
   }
+  
+  #take a "point" from a plot and return the correpsonding point in "data"
   updatePoint <- function(point, data){
     return(data[row.names(point),])
   }

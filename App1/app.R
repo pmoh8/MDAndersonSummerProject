@@ -111,8 +111,17 @@ ui <-
                                                            plotOutput("plot",
                                                                       click = "plot_click",
                                                                       brush = brushOpts(id="plot_brush")
-                                                           )
-                                                         )
+                                                                      )
+                                                           ),
+                                                           conditionalPanel(condition = '!output.showTable',
+                                                                            actionButton("show_table","Show Data Table")
+                                                                            ),
+                                                           conditionalPanel(condition = 'output.showTable',
+                                                                            actionButton("hide_table","Hide Data Table"),
+                                                                            br(),
+                                                                            br(),
+                                                                            div(DT::dataTableOutput("data_table"), style = "font-size:80%")
+                                                                            )
                                                   ),
                                                   #Display right ("zoomed-in") scatterplot
                                                   column(6,
@@ -123,13 +132,13 @@ ui <-
                                                                                        click = "plot_zoom_click")),
                                                                           #Allow user to toggle whether ot not they want to see a table with the plotted data
                                                                           conditionalPanel(condition ='!output.showZoomTable',
-                                                                                           actionButton("show_zoom_table","Show Data")
+                                                                                           actionButton("show_zoom_table","Show Data Table")
                                                                                            ),
                                                                           conditionalPanel(condition = 'output.showZoomTable',
-                                                                                           actionButton("hide_zoom_table","Hide Data"),
+                                                                                           actionButton("hide_zoom_table","Hide Data Table"),
                                                                                            br(),
                                                                                            br(),
-                                                                                           DT::dataTableOutput("zoom_table")
+                                                                                           div(DT::dataTableOutput("zoom_table"), style = "font-size:80%")
                                                                                            )
                                                          )
                                                   )
@@ -181,17 +190,9 @@ ui <-
 ########################################################
 server <- function(input, output, session) {
   
-  #BEGIN TEST VALUES
-  x <- rnorm(500)
-  y <- rnorm(500)
-  testdata <- data.frame(x = x, y = y)
-  plotdata <- reactiveValues(zoomdata=(NULL))
-  #END TEST VALUES
-  
   ###############################
   ######## GENERAL SETUP ########
   ############################### 
-  
   #Set up some aesthetics
   cbPalette <- c("#009E73", "#F0E442", "#0072B2", "#CC79A7","#56B4E9")
   
@@ -206,33 +207,52 @@ server <- function(input, output, session) {
   
   #intialize reactive values for points the user can choose to highlight by clicking on each plot
   points <- reactiveValues(pnt = NULL, pnt_zoom=NULL)
+  plotdata <- reactiveValues(zoomdata=(NULL))
   
+  ##################################
   #for the left ("zoomed"-out") plot
+  ##################################
+  #Read in data for the x and y coordinates of the plot
   inputdata_x <- readRDS("CCLE_copynumber_byGene_2013-12-03")
   inputdata_y <- inputdata_x 
+  
+  #Have the user select which genes to display on the x and y axis respectively
   x_sel <- reactive({
+    #when the user changes what gene to display, clear the highlighted points the user selected by clicking on the plot
     clearPoints()
     return(input$gene_x)
   })
   y_sel <- reactive({
+    #when the user changes what gene to display, clear the highlighted points the user selected by clicking on the plot
     clearPoints()
     return(input$gene_y)
   }) 
+  
+  #Have the user select which datatypes to go with the genes to display on the x and y axis respectively
   x_datatype <- reactive({return(input$datatype_x)})
   y_datatype <- reactive({return(input$datatype_y)})
   
+  #################################
   #For the right ("zoomed-in") plot
+  #################################
+  #Have the user select which genes to display on the x and y axis respectively
   x_zoom_sel <- reactive({
+    #when the user changes what gene to display, clear the highlighted points the user selected by clicking on the plot
     points$pnt_zoom <- NULL
     return(input$gene_zoom_x)
   })
   y_zoom_sel <- reactive({
+    #when the user changes what gene to display, clear the highlighted points the user selected by clicking on the plot
     points$pnt_zoom <- NULL
     return(input$gene_zoom_y)
   })
-  # x_zoom_datatype
-  # y_zoom_datatype
+  #Have the user select which datatypes to go with the genes to display on the x and y axis respectively
+  x_zoom_datatype <- reactive({return(input$datatype_zoom_x)})
+  y_zoom_datatype <- reactive({return(input$datatype_zoom_y)})
   
+  ##################
+  #Read in RDS files
+  ##################
   #Read in the selection options for x_sel, y_sel, x_zoom_sel, and y_zoom_sel
   DNAcopy_options <- reactive({
     return(readRDS("DNAcopy_options_CCLE_copynumber_byGene_2013-12-03"))
@@ -249,18 +269,20 @@ server <- function(input, output, session) {
   ######## CHECK EVENT FLAGS ########
   ###################################
   #values for event flags
-  flags <- reactiveValues(brushActive = 0, showZoomTable = FALSE)
+  flags <- reactiveValues(brushActive = 0, showZoomTable = FALSE, showTable = FALSE)
   output$brushActive <- reactive({ return(flags$brushActive) })
   output$showZoomTable <- reactive({ return(flags$showZoomTable)})
+  output$showTable <- reactive({ return(flags$showTable)} )
   outputOptions(output, name = "brushActive", suspendWhenHidden = FALSE)
   outputOptions(output, name = "showZoomTable", suspendWhenHidden = FALSE)
+  outputOptions(output, name = "showTable", suspendWhenHidden = FALSE)
   
   #Check to see if the brush is active
   observeEvent(plotdata$zoomdata, {
     if(is.data.frame(plotdata$zoomdata) && nrow(plotdata$zoomdata)==0) {
       flags$brushActive <- 0
       flags$defaultZoomView <- 1
-      print("brush is not active")
+      #print("brush is not active")
     }
     else{
       if(flags$brushActive == 0){
@@ -268,26 +290,31 @@ server <- function(input, output, session) {
         #Reset the selectinput options on the right/"zoomed-in" control panel
         updateSelectInput(session, "gene_zoom_x",selected=x_sel())
         updateSelectInput(session, "gene_zoom_y",selected=y_sel())
-        print("zoom plot has been reset to default")
+        #print("zoom plot has been reset to default")
       }
       flags$brushActive <- 1
-      print("brush is active!")
+      #print("brush is active!")
     }
   })
   #If the user has selected data points with the brush, save them to the reactiveValue "zoomdata"
-  observeEvent(input$plot_brush,{plotdata$zoomdata <- brushedPoints(testdata,input$plot_brush)})
+  observeEvent(input$plot_brush,{plotdata$zoomdata <- brushedPoints(defaultplotdata,input$plot_brush)})
   
   #Observe whether the user has decided to toggle the data table on the right/"zoomed-in" plot for viewing
   observeEvent(input$show_zoom_table,{
     flags$showZoomTable <- TRUE
-    print("zoomtable = true")
-    print(flags$showZoomTable)
     makeZoomTable(plottingdata,x_zoom_sel(),y_zoom_sel())
   })
   observeEvent(input$hide_zoom_table,{
-    flags$showZoomTable <- FALSE
-    print("zoomtable = false")
     print(flags$showZoomTable)
+  })
+  
+  #Observe whether the user has decided to toggle the data table on the left/"zoomed-out" plot for viewing
+  observeEvent(input$show_table,{
+    flags$showTable <- TRUE
+    makeTable(defaultplotdata,x_sel(),y_sel())
+  })
+  observeEvent(input$hide_zoom_table,{
+    flags$showTable <- FALSE
   })
   
   #If appropriate, make the table to display the data in the right/"zoomed-in" plot
@@ -299,6 +326,15 @@ server <- function(input, output, session) {
       })
     }
   }
+  
+  makeTable <- function(data,x_axis,y_axis){
+    if(flags$showTable){
+      output$data_table <- DT::renderDataTable({
+        displayTable <- datatable(data[,1:2],colnames = c(x_axis,y_axis))
+        return(displayTable)
+      })
+    }
+  } 
   #######################################
   ####### RENDERING USER OPTIONS ########
   #######################################
@@ -364,6 +400,13 @@ server <- function(input, output, session) {
       if(!is.null(points$pnt_zoom) && (flags$brushActive != 0)){
         matched_pnt_zoom <- updatePoint(points$pnt_zoom,defaultplotdata)
         defaultplot <<- plotPointOnClick(defaultplot, input$plot_zoom_click, matched_pnt_zoom, colOrn, ptMed, updatePoint = FALSE)
+      }
+      
+      #Add in user-selected highlights from the printed data table
+      tableHighlights = input$data_table_rows_selected
+      print(tableHighlights)
+      if(length(tableHighlights)){
+        defaultplot <<- defaultplot + geom_point(data = defaultplotdata[tableHighlights,], aes(x,y), color=colRed, size = ptSmol)
       }
       
       #Add user-clicked highlighted points
@@ -510,7 +553,9 @@ server <- function(input, output, session) {
   
   #Print data associated with the point (such as DNA copy number, mRNA, etc)
   printPoint <- function(point,x_axis,y_axis){
+    #Make sure the point is valid before trying to do anything
     if(is.data.frame(point) && nrow(point)!=0) {
+      #See if the x and y-axis are the same so that we don't mess up and have duplicate row names and make R throw a fit
       if(x_axis != y_axis){
         pointDetail <- data.frame(c(point$x, point$y))
         row.names(pointDetail)<-c(x_axis,y_axis)
@@ -519,7 +564,10 @@ server <- function(input, output, session) {
         pointDetail <- data.frame(c(point$x))
         row.names(pointDetail)<-c(x_axis) 
       }
+      
+      #add column names
       names(pointDetail)<-c("DNA Copy #")
+      
       return (pointDetail)
     }
   }

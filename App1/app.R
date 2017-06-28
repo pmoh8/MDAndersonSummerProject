@@ -77,7 +77,7 @@ ui <-
                                                   #display details of the right plot ("zoomed-in" plot)
                                                   column(6,
                                                          #only display IF the user has selected a potion of the left plot
-                                                         conditionalPanel(condition = 'output.brushActive != 0',
+                                                         conditionalPanel(condition = 'output.brushActive',
                                                                           fluidRow(column(1),
                                                                                    column(10, wellPanel(uiOutput("cell_zoom_details")))
                                                                           )
@@ -94,7 +94,7 @@ ui <-
                                                          )
                                                   ),
                                                   column(6,
-                                                         conditionalPanel(condition = 'output.brushActive != 0',
+                                                         conditionalPanel(condition = 'output.brushActive',
                                                                           fluidRow(column(1),
                                                                                    column(10, wellPanel(tableOutput("zoom_click_info")))
                                                                           )
@@ -126,7 +126,7 @@ ui <-
                                                   #Display right ("zoomed-in") scatterplot
                                                   column(6,
                                                          #only display IF the user has selected a potion of the left plot
-                                                         conditionalPanel(condition = 'output.brushActive != 0',
+                                                         conditionalPanel(condition = 'output.brushActive',
                                                                           wellPanel(
                                                                             plotOutput("plot_zoom",
                                                                                        click = "plot_zoom_click")),
@@ -148,7 +148,7 @@ ui <-
                                          ######## USER CONTROL PANEL (SIDEBAR) ########
                                          ##############################################
                                          column(2,
-                                                conditionalPanel(condition = 'output.brushActive != 0',
+                                                conditionalPanel(condition = 'output.brushActive',
                                                                  wellPanel(
                                                                    #labels for data selection options
                                                                    fluidRow(   column(2),   column(5, "x-axis"),   column(5, "y-axis")   ),
@@ -194,7 +194,7 @@ server <- function(input, output, session) {
   ######## GENERAL SETUP ########
   ############################### 
   #Set up some aesthetics
-  cbPalette <- c("#009E73", "#F0E442", "#0072B2", "#CC79A7","#56B4E9")
+  cbPalette <- c("#009E73", "#0072B2", "#CC79A7","#56B4E9","#F0E442")
   
   ptBig = 5
   ptMed = 3
@@ -269,7 +269,7 @@ server <- function(input, output, session) {
   ######## CHECK EVENT FLAGS ########
   ###################################
   #values for event flags
-  flags <- reactiveValues(brushActive = 0, showZoomTable = FALSE, showTable = FALSE)
+  flags <- reactiveValues(brushActive = FALSE, showZoomTable = FALSE, showTable = FALSE)
   output$brushActive <- reactive({ return(flags$brushActive) })
   output$showZoomTable <- reactive({ return(flags$showZoomTable)})
   output$showTable <- reactive({ return(flags$showTable)} )
@@ -280,19 +280,19 @@ server <- function(input, output, session) {
   #Check to see if the brush is active
   observeEvent(plotdata$zoomdata, {
     if(is.data.frame(plotdata$zoomdata) && nrow(plotdata$zoomdata)==0) {
-      flags$brushActive <- 0
+      flags$brushActive <- FALSE
       flags$defaultZoomView <- 1
       #print("brush is not active")
     }
     else{
-      if(flags$brushActive == 0){
+      if(!flags$brushActive){
         flags$defaultZoomView <- 0
         #Reset the selectinput options on the right/"zoomed-in" control panel
         updateSelectInput(session, "gene_zoom_x",selected=x_sel())
         updateSelectInput(session, "gene_zoom_y",selected=y_sel())
         #print("zoom plot has been reset to default")
       }
-      flags$brushActive <- 1
+      flags$brushActive <- TRUE
       #print("brush is active!")
     }
   })
@@ -305,7 +305,7 @@ server <- function(input, output, session) {
     makeZoomTable(plottingdata,x_zoom_sel(),y_zoom_sel())
   })
   observeEvent(input$hide_zoom_table,{
-    print(flags$showZoomTable)
+    flags$showZoomTable <- FALSE
   })
   
   #Observe whether the user has decided to toggle the data table on the left/"zoomed-out" plot for viewing
@@ -313,7 +313,7 @@ server <- function(input, output, session) {
     flags$showTable <- TRUE
     makeTable(defaultplotdata,x_sel(),y_sel())
   })
-  observeEvent(input$hide_zoom_table,{
+  observeEvent(input$hide_table,{
     flags$showTable <- FALSE
   })
   
@@ -344,7 +344,7 @@ server <- function(input, output, session) {
   
   #Actual rendering
   output$cancer_selector <- renderUI({
-    selectInput("cancer_selection", NULL, cancer_options, multiple = TRUE)
+    selectizeInput("cancer_selection", NULL, cancer_options, options = list(maxItems = 5))
   })
   output$gene_x_selector <- renderUI({
     selectInput("gene_x", NULL, DNAcopy_options())
@@ -495,7 +495,7 @@ server <- function(input, output, session) {
       #plot the user-click highlighted points
       matched_pnt <- updatePoint(points$pnt,plottingdata)
       zoomplot <- plotPointOnClick(zoomplot, input$plot_click, matched_pnt, colRed, ptMed, updatePoint = FALSE)
-      zoomplot <- plotPointOnClick (zoomplot, input$plot_zoom_click, points$pnt_zoom, colOrn, ptBig, updatePoint = TRUE)
+      zoomplot <- plotPointOnClick(zoomplot, input$plot_zoom_click, points$pnt_zoom, colOrn, ptBig, updatePoint = TRUE)
       
       #update the stored point of interest if needed
       if(!(is.null(input$plot_zoom_click) && is.null(points$pnt_zoom) ) && !is.null(input$plot_zoom_click)){

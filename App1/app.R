@@ -212,7 +212,7 @@ server <- function(input, output, session) {
   #intialize reactive values for points the user can choose to highlight by clicking on each plot
   points <- reactiveValues(pnt = NULL, pnt_zoom=NULL)
   plotdata <- reactiveValues(zoomdata=(NULL))
-  
+  plottingdata <- NULL
   ##################################
   #for the left ("zoomed"-out") plot
   ##################################

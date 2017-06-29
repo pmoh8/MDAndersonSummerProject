@@ -137,6 +137,10 @@ ui <-
                                                                           conditionalPanel(condition = 'output.showZoomTable',
                                                                                            actionButton("hide_zoom_table","Hide Data Table"),
                                                                                            br(),
+                                                                                           conditionalPanel(condition = 'output.zoomTableHasSelected',
+                                                                                             actionButton("clear_zoom_table_selection","Clear Selection")
+                                                                                           ),
+                                                                                          
                                                                                            br(),
                                                                                            div(DT::dataTableOutput("zoom_table"), style = "font-size:80%")
                                                                                            )
@@ -269,13 +273,15 @@ server <- function(input, output, session) {
   ######## CHECK EVENT FLAGS ########
   ###################################
   #values for event flags
-  flags <- reactiveValues(brushActive = FALSE, showZoomTable = FALSE, showTable = FALSE)
+  flags <- reactiveValues(brushActive = FALSE, showZoomTable = FALSE, showTable = FALSE, zoomTableHasSelected = FALSE)
   output$brushActive <- reactive({ return(flags$brushActive) })
   output$showZoomTable <- reactive({ return(flags$showZoomTable)})
   output$showTable <- reactive({ return(flags$showTable)} )
+  output$zoomTableHasSelected <- reactive({ return(flags$zoomTableHasSelected) })
   outputOptions(output, name = "brushActive", suspendWhenHidden = FALSE)
   outputOptions(output, name = "showZoomTable", suspendWhenHidden = FALSE)
   outputOptions(output, name = "showTable", suspendWhenHidden = FALSE)
+  outputOptions(output, name = "zoomTableHasSelected", suspendWhenHidden = FALSE)
   
   #Check to see if the brush is active
   observeEvent(plotdata$zoomdata, {
@@ -317,6 +323,16 @@ server <- function(input, output, session) {
     flags$showTable <- FALSE
   })
   
+  observeEvent(input$zoom_table_rows_selected, {
+    if(length(input$zoom_table_rows_selected)){
+      flags$zoomTableHasSelected <- TRUE
+    }
+    else{
+      flags$zoomTableHasSelected <- FALSE
+    }
+    print("flag")
+    print(flags$zoomTableHasSelected)
+  })
   #If appropriate, make the table to display the data in the right/"zoomed-in" plot
   makeZoomTable <- function(data,x_axis,y_axis){
     if(flags$showZoomTable){
@@ -344,7 +360,7 @@ server <- function(input, output, session) {
   
   #Actual rendering
   output$cancer_selector <- renderUI({
-    selectizeInput("cancer_selection", NULL, cancer_options, options = list(maxItems = 5))
+    selectizeInput("cancer_selection", NULL, cancer_options, selected=NULL, multiple=TRUE,options = list(maxItems = 5))
   })
   output$gene_x_selector <- renderUI({
     selectInput("gene_x", NULL, DNAcopy_options())
@@ -371,8 +387,10 @@ server <- function(input, output, session) {
     #Select the appropriate rows from our database table based on user input
     if(TRUE){
       #Get the x and y values of interest and save them to a data frame
-      x <- sapply(inputdata_x[inputdata_x[,"SYMBOL"]==x_sel(),-c(1:5)], as.numeric)
-      y <- sapply(inputdata_y[inputdata_y[,"SYMBOL"]==y_sel(),-c(1:5)], as.numeric)
+      #x <- as.matrix(inputdata_x[inputdata_x[,"SYMBOL"]==x_sel(),-c(1:5)])
+      #y <- as.matrix(inputdata_y[inputdata_x[,"SYMBOL"]==y_sel(),-c(1:5)])
+       x <- sapply(inputdata_x[inputdata_x[,"SYMBOL"]==x_sel(),-c(1:5)], as.numeric)
+       y <- sapply(inputdata_y[inputdata_y[,"SYMBOL"]==y_sel(),-c(1:5)], as.numeric)
       
       #make the dataframe to hold the information we're displaying in the scatterplot
       defaultplotdata <<- data.frame(x = x, y = y)
@@ -404,6 +422,7 @@ server <- function(input, output, session) {
       
       #Add in user-selected highlights from the printed data table
       tableHighlights = input$data_table_rows_selected
+      print("tableHighlights")
       print(tableHighlights)
       if(length(tableHighlights)){
         defaultplot <<- defaultplot + geom_point(data = defaultplotdata[tableHighlights,], aes(x,y), color=colRed, size = ptSmol)
@@ -487,6 +506,7 @@ server <- function(input, output, session) {
       
       #Add in user-selected highlights from the printed data table
       tableHighlights = input$zoom_table_rows_selected
+      print("zoomtablehighlights")
       print(tableHighlights)
       if(length(tableHighlights)){
         zoomplot <<- zoomplot + geom_point(data = plottingdata[tableHighlights,], aes(x,y), color=colOrn, size = ptSmol)

@@ -342,7 +342,13 @@ server <- function(input, output, session) {
       })
     }
   }
-  
+  zoomProxy = dataTableProxy('zoom_table')
+  observeEvent(input$clear_zoom_table_selection, {
+    print("clearing selection")
+    zoomProxy %>% selectRows(NULL)
+    print(input$zoom_table_rows_selected)
+    flags$zoomTableHasSelected <- FALSE
+  })
   makeTable <- function(data,x_axis,y_axis){
     if(flags$showTable){
       output$data_table <- DT::renderDataTable({

@@ -1,0 +1,21 @@
+---
+title: "TKO Visualization"
+author: "Summer"
+date: "6/23/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Load datasets
+```{r}
+hct116_1 <- read.table("readcount-HCT116_1-lib1",header=TRUE)
+hela <- read.table("readcount-HeLa-lib1")
+```
+
+### Add gene category columns
+```{r}
+
+```

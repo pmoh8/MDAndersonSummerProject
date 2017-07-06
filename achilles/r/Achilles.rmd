@@ -1,0 +1,190 @@
+---
+title: "Dataset Visualization"
+author: "Oscar Villarreal"
+date: "6/19/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+<!-- PART I. SAMPLE INFORMATION -------------------------------------------------------------------------------------------------------------- -->
+
+### Read Data
+```{r}
+source("common2.R")
+dataset <- read.gct("Achilles_v3.3.8_rawreadcounts.gct")$data
+write.table(dataset,"Achilles_v3.3.8_rawreadcounts.txt",quote=F,col.names = T,row.names = T,sep='\t')
+dataset <- read.table("Achilles_v3.3.8_rawreadcounts.txt",header=T,sep='\t',as.is=T)
+sampleAnnotation <- data.frame(Sample=colnames(dataset))
+# Cell line:
+keyword <- regexpr(".311cas9|.311Cas9|_pXPR003",sampleAnnotation$Sample)
+sampleAnnotation$Cell_line <- substring(sampleAnnotation$Sample,1,keyword-1)
+sampleAnnotation$Cell_line <- gsub("\\.","",sampleAnnotation$Cell_line)
+# Replicate:
+sampleAnnotation$Replicate <- "Replicate"
+sampleAnnotation$Replicate[grep("Rep.A",sampleAnnotation$Sample)] <- "A"
+sampleAnnotation$Replicate[grep("Rep.B",sampleAnnotation$Sample)] <- "B"
+sampleAnnotation$Replicate[grep("Rep.C",sampleAnnotation$Sample)] <- "C"
+sampleAnnotation$Replicate[grep("Rep.D",sampleAnnotation$Sample)] <- "D"
+sampleAnnotation$Replicate[grep("Rep.1",sampleAnnotation$Sample)] <- "1"
+sampleAnnotation$Replicate[grep("Rep.2",sampleAnnotation$Sample)] <- "2"
+sampleAnnotation$Replicate[grep("Rep.3",sampleAnnotation$Sample)] <- "3"
+sampleAnnotation$Replicate[grep("Rep.4",sampleAnnotation$Sample)] <- "4"
+sampleAnnotation$Replicate[grep("pDNA",sampleAnnotation$Sample)] <- "Plasmid"
+library(openxlsx)
+sampleAnnotation1 <- openxlsx::read.xlsx("161988_1_supp_3499401_c7xydc.xlsx")
+names(sampleAnnotation1)[2] <- "Cell_line"
+sampleAnnotation <- merge(sampleAnnotation, sampleAnnotation1)
+write.table(sampleAnnotation,"Achilles_v3.3.8_rawreadcounts_sample_annotation.txt",quote=F,col.names = T,row.names = F,sep='\t')
+```
+
+### Category distribution of Primary Disease
+```{r}
+library(ggplot2)
+my_data <- data.frame(table(sampleAnnotation$Primary.Disease))
+names(my_data) <- c("Primary Disease", "Frequency")
+p1 <- ggplot(my_data, aes(x=factor(1), y=Frequency, fill=`Primary Disease`)) + geom_bar(stat="identity") + 
+  coord_polar(theta = "y") + xlab("") + 
+  theme(axis.text.y=element_blank(),axis.ticks.y=element_blank()) + ylab("")
+ggsave("Primary_Disease.png",p1)
+```
+
+### Category distribution of Primary Site
+```{r}
+library(ggplot2)
+my_data <- data.frame(table(sampleAnnotation$Primary_Site))
+names(my_data) <- c("Primary Site", "Frequency")
+p1 <- ggplot(my_data, aes(x=factor(1), y=Frequency, fill=`Primary Site`)) + geom_bar(stat="identity") + 
+  coord_polar(theta = "y") + xlab("") + 
+  theme(axis.text.y=element_blank(),axis.ticks.y=element_blank()) + ylab("")
+ggsave("Primary_Site.png",p1)
+```
+
+<!-- PART II. GENE INFORMATION -------------------------------------------------------------------------------------------------------------- -->
+
+### Add gene column
+```{r}
+mappings <- read.table(file="Achilles_v3.3.8_sgRNA_mappings.txt",header=T,sep='\t',as.is=T)
+underscores <- regexpr("_", mappings$Guide)
+mappings$Name <- substring(mappings$Guide, 1, underscores-1)
+mappings$Gene <- substring(mappings$Guide, underscores+1)
+counts <- merge(dataset, unique(mappings[,c("Name","Gene")]))
+```
+
+### Add category column:
+```{r}
+library(openxlsx)
+ranking_hart <- openxlsx::read.xlsx("msb0010-0733-sd1.xlsx", sheet=1)
+essentials <- na.omit(ranking_hart$`ConstitutiveCoreEssentials(CCE)`)
+nonessentials <- na.omit(ranking_hart$`Nonessential.Genes.(NE)`)
+counts <- counts[-grep("NO_CURRENT_A|NO_CURRENT_C|NO_CURRENT_G|NO_CURRENT_T",counts$Gene),]
+counts$Category <- "Other"
+counts$Category[grep("NO_CURRENT", counts$Gene)] <- "Nontargeting"
+counts$Category[counts$Gene %in% essentials] <- "Essential"
+counts$Category[counts$Gene %in% nonessentials] <- "Nonessential"
+
+# Rearrange the columns to have the information at the beginning:
+counts$Description <- NULL
+info <- which(names(counts) %in% c("Name","Gene","Category"))
+counts <- cbind(counts[,info], counts[,-info])
+info <- which(names(counts) %in% c("Name","Gene","Category"))
+
+# Some of the rows are repeated (because the same spacer can correspond to multiple genes), so we need to remove them when doing calculations:
+repetitions <- table(counts$Name)
+repetitions <- repetitions[repetitions>1]
+
+# Remove repeated rows:
+counts <- subset(counts, !duplicated(counts$Name)) 
+repetitions <- table(counts$Name)
+repetitions <- repetitions[repetitions>1]
+```
+
+### Category distribution of sgRNA pairs
+```{r}
+library(ggplot2)
+my_data <- data.frame(table(counts$Category))
+names(my_data) <- c("Category", "Frequency")
+ggplot(my_data, aes(x=factor(1), y=Frequency, fill=Category)) + geom_bar(stat="identity") + 
+  coord_polar(theta = "y") + xlab("") + 
+  theme(axis.text.y=element_blank(),axis.ticks.y=element_blank()) + ylab("")
+```
+
+### Plot Counts vs Sample
+```{r}
+library(ggplot2)
+my_data <- split(counts[,-info], counts$Category)
+my_data <- do.call(rbind, lapply(my_data, colSums))
+my_data <- melt(my_data, value.name="Sum", varnames=c("Category","Sample"))
+ggplot(my_data, aes(x = Sample, y = Sum, fill=Category)) + geom_bar(stat = "identity") +
+  theme(axis.text.x=element_text(angle=90,hjust=1), legend.position="bottom") + xlab("")
+```
+
+### Number of sgRNAs with zero counts
+```{r}
+library(ggplot2)
+library(reshape2)
+my_data <- split(counts[,-info], counts$Category)
+my_data <- do.call(rbind, lapply(my_data, function(x) apply(x,2,function(y) sum(y==0))))
+my_data <- melt(my_data, value.name="Zeroes", varnames=c("Category","Sample"))
+ggplot(my_data, aes(x = Sample, y = Zeroes, fill=Category)) + geom_bar(stat = "identity") +
+  theme(axis.text.x=element_text(angle=90,hjust=1), legend.position="bottom") + xlab("")
+```
+
+### Make a table of sgRNAs ranked by counts
+```{r,fig.height=4}
+library(gridExtra)
+tt1 <- ttheme_minimal(base_size=8,
+  core=list(fg_params=list(fontface=3),bg_params=list(fill=c("lightblue","lightgreen"),alpha=0.5,col=NA)),
+  colhead=list(fg_params=list(col="white",fontface=4L),bg_params=list(fill="darkblue")),
+  rowhead=list(fg_params=list(col="orange", fontface=3L),bg_params=list(fill="white")))
+tt2 <- ttheme_minimal(base_size=7,
+  core=list(fg_params=list(fontface=3),bg_params=list(fill=c("pink","chocolate"),alpha=0.5,col=NA)),
+  colhead=list(fg_params=list(col="white",fontface=4L),bg_params=list(fill="darkred")),
+  rowhead=list(fg_params=list(col="orange", fontface=3L),bg_params=list(fill="white")))
+p1 <- tableGrob(counts[order(counts[,4],decreasing=T)[1:30],c(1:3,4)],theme=tt1,rows=NULL)
+grid.arrange(p1,nrow=1)
+```
+
+### Normalize by nonspecific genes and get log2 transform
+```{r}
+logged <- normed <- counts
+normed[,-info] <- apply(counts[,-info], 2, function(x) x/median(x[counts$Category=="Nontargeting"]))
+logged[,-info] <- log2(normed[,-info] + 0.05)
+```
+
+### Principal Components of the Samples: 2nd vs 1st
+```{r,fig.width=10,fig.height=10}
+library(ggrepel)
+pca_sample <- prcomp(t(logged[,-info]),scale=F)
+my_data <- data.frame(Z1=pca_sample$x[,1],Z2=pca_sample$x[,2],Sample=names(counts[,-info]))
+ggplot(my_data, aes(Z1,Z2,label=Sample)) + geom_text_repel() + geom_point() + 
+  xlab("First Principal Component for Samples") + ylab("Second Principal Component")
+```
+
+## Make a heatmap of euclidean distances between samples using first 3 principal components
+```{r,fig.width=10,fig.height=10}
+library(gplots)
+my_data <- as.matrix(dist(pca_sample$x[,1:3], method="euclidean"))
+heatmap.2(my_data,margins=c(11,11),density="density",tracecol="black",trace="none")
+```
+
+### Proportion of Variance Explained
+```{r}
+library(gridExtra)
+pve_sample <- 100*pca_sample$sdev^2/sum(pca_sample$sdev^2)
+my_data=data.frame(PC=seq(1:length(pve_sample)),pve_sample=pve_sample)
+p1 <- ggplot(my_data,aes(PC,pve_sample)) + geom_line(col="blue") + geom_point(col="darkblue",shape="O",size=5) + xlab("Principal Component") + ylab("Proportion of Variance Explained")
+my_data=data.frame(PC=seq(1:length(pve_sample)),Cpve_sample=cumsum(pve_sample))
+p2 <- ggplot(my_data,aes(PC,Cpve_sample)) + geom_line(col="blue") + geom_point(col="darkblue",shape="O",size=5) + xlab("Principal Component") + ylab("Cumulative PVE")
+grid.arrange(p1,p2,nrow=2)
+```
+
+### Hierarchical clustering of samples using the 3 first principal components
+```{r,fig.width=10,fig.height=10}
+clustered <- hclust(dist(pca_sample$x[,1:3]))
+plot(clustered,labels=names(logged[,-info]),xlab="",sub="",ylab="")
+```
+
+

@@ -1,0 +1,97 @@
+---
+title: "Preprocess"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+<!-- MERGE TKO DATASETS INTO A SINGLE FILE ------------------------------------------------------>
+
+### Load datasets
+```{r}
+counts1A <- read.table("readcount-HCT116_1-lib1",header=T,sep='\t',as.is=T)
+counts1B <- read.table("readcount-HCT116_2-lib1",header=T,sep='\t',as.is=T)
+counts2 <- read.table("readcount-HeLa-lib1",header=T,sep='\t',as.is=T)
+counts3 <- read.table("readcount-RPE1-lib1",header=T,sep='\t',as.is=T)
+counts4 <- read.table("readcount-DLD1-lib1",header=T,sep='\t',as.is=T)
+counts5 <- read.table("readcount-GBM-lib1",header=T,sep='\t',as.is=T)
+```
+
+### Merge datasets
+```{r}
+info <- c(1,2)
+names(counts1A)[-info] <- paste0("HCT116_1_",names(counts1A)[-info])
+names(counts1B)[-info] <- paste0("HCT116_2_",names(counts1B)[-info])
+names(counts2)[-info] <- paste0("HeLa_",names(counts2)[-info])
+names(counts3)[-info] <- paste0("RPE1_",names(counts3)[-info])
+names(counts5)[-info] <- paste0("GBM_",names(counts5)[-info])
+counts <- merge(counts1A,counts1B)
+counts <- merge(counts,counts2)
+counts <- merge(counts,counts3)
+counts <- merge(counts,counts4)
+counts <- merge(counts,counts5)
+```
+
+### Add column of gene categories
+```{r}
+# install.packages("openxlsx")
+library(openxlsx)
+ranking <- openxlsx::read.xlsx("msb0010-0733-sd1.xlsx", sheet=1)
+essentials <- na.omit(ranking$`ConstitutiveCoreEssentials(CCE)`)
+nonessentials <- na.omit(ranking$`Nonessential.Genes.(NE)`)
+counts$CATEGORY <- "Other"
+counts$CATEGORY[counts$GENE %in% essentials] <- "Essential"
+counts$CATEGORY[counts$GENE %in% nonessentials] <- "Nonessential"
+table(counts$CATEGORY)
+```
+
+### Rearrange columns
+```{r}
+info <- grep("GENE_CLONE|GENE|CATEGORY",names(counts))
+initial <- which(names(counts)%in%c("HCT116_1_LIB1_T0","HCT116_2_T0","HeLa_T0","RPE1_T0","DLD_T0","GBM_T0"))
+counts <- cbind(counts[,info], counts[,initial], counts[,-c(info,initial)])
+```
+
+### Save full dataset
+```{r}
+write.table(counts,file="tko_lib1.txt",quote=F,sep='\t',row.names=F,col.names=T)
+```
+
+
+<!-- CREATE SAMPLE ANNOTATION FILE ------------------------------------------------------------------------>
+
+### Load full dataset
+```{r}
+counts <- read.table("tko_lib1.txt",header=T,sep='\t',as.is=T)
+```
+
+```{r}
+sampleAnnotation <- data.frame(Sample=names(counts)[-c(1:3)])
+# underscore <- regexpr("_",sampleAnnotation$Sample)
+# sampleAnnotation$Cell_line <- substring(sampleAnnotation$Sample,1,underscore-1)
+# keyword <- regexpr("_T",sampleAnnotation$Sample)
+# sampleAnnotation$Timepoint <- substring(sampleAnnotation$Sample,keyword+1)
+write.table(sampleAnnotation,"sampleAnnotation.txt",quote=F,row.names=F,col.names=T,sep='\t')
+```
+
+
+<!-- GENE VISUALIZATION ------------------------------------------------------------------------------>
+
+### Fold change plot
+```{r}
+library(reshape2)
+library(ggplot2)
+hct116_1_A <- counts[3029,c("GENE_CLONE","GENE","CATEGORY","HCT116_1_LIB1_T0","HCT116_1_LIB1_T6_A","HCT116_1_LIB1_T9_A", "HCT116_1_LIB1_T12_A","HCT116_1_LIB1_T15_A","HCT116_1_LIB1_T18_A")]
+hct116_1_B <- counts[3029,c("GENE_CLONE","GENE","CATEGORY","HCT116_1_LIB1_T0","HCT116_1_LIB1_T6_B","HCT116_1_LIB1_T9_B", "HCT116_1_LIB1_T12_B","HCT116_1_LIB1_T15_B","HCT116_1_LIB1_T18_B")]
+hct116_1_A_melted <- melt(hct116_1_A,id.vars=c("GENE_CLONE","GENE","CATEGORY"),value.name="Reads",variable.name="Sample")
+hct116_1_A_melted$Timepoint <- c(0,6,9,12,15,18)
+hct116_1_A_melted$Reads <- hct116_1_A_melted$Reads / hct116_1_A_melted$Reads[1]
+ggplot(hct116_1_A_melted,aes(x=Timepoint,y=Reads)) + geom_point()
+```
+
+
+
+
+

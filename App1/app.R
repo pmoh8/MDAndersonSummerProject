@@ -2,6 +2,7 @@ library(shiny)
 library(DT)
 library(ggplot2)
 library(RSQLite)
+library(bcrypt)
 source("common2.R")
 ################################################################
 ######################## USER INTERFACE ########################
@@ -13,11 +14,36 @@ ui <-
                               font-size: 70%;
                               }
                               "))),
-    #Set up tabs
+    #Application title
     div(style="display: inline-block;vertical-align:center;",titlePanel("Cool Application")),
-    div(style="display: inline-block;vertical-align:center;float:right;",actionButton("loginButt", "Login")),
-    div(style="display: inline-block;vertical-align:center;float:right; width: 150px;",passwordInput("inputPass", NULL, value = "", width = NULL, placeholder = "password")),
-    div(style="display: inline-block;vertical-align:center;float:right; width: 150px;",textInput("inputId", NULL, value = "", width = NULL, placeholder = "username")),
+    
+    #Login option:  display only when user is not logged in
+    conditionalPanel(condition = '!output.loggedIn',
+                     fluidRow(
+                       div(style="display: inline-block;vertical-align:center;float:right;",column(1,"")),
+                        div(style="display: inline-block;vertical-align:center;float:right;",
+                            div(style="display: inline-block;vertical-align:center;",textInput("inputUser", NULL, value = "", width = 150, placeholder = "username")),
+                            div(style="display: inline-block;vertical-align:center;",passwordInput("inputPass", NULL, value = "", width = 150, placeholder = "password")),
+                            div(style="display: inline-block;vertical-align:center;",actionButton("loginButt", "Login"))
+                            )
+                       ),
+                     fluidRow(
+                       div(style="display: inline-block;vertical-align:center;float:right;",column(1,"")),
+                       div(style="vertical-align:center;float:right;color:red;", textOutput("loginError")) 
+                     ),
+                     fluidRow(
+                       div(style="display: inline-block;vertical-align:center;float:right;",column(1,"")),
+                       div(style="vertical-align:center;float:right;", actionLink("registerButt","Don't have an account?  Click here to register!"))
+                     )
+    ),
+    
+    #Logout option:  display only when user is logged in
+    conditionalPanel(condition = 'output.loggedIn',
+                     div(style="display: inline-block;vertical-align:center;float:right;",actionButton("logoutButt", "Logout")),
+                     div(style="display: inline-block;vertical-align:center;float:right; width: 250px;", textOutput("userinfo"))
+    ),
+    
+    #set up tabs
     sidebarLayout("",
                   mainPanel(width = 12,
                             tabsetPanel(
@@ -160,15 +186,14 @@ ui <-
                                                                    #labels for data selection options
                                                                    fluidRow(   column(2),   column(5, "x-axis"),   column(5, "y-axis")   ),
                                                                    #row to select data types to view (such as RNAseq or DNA copy number)
+                        
                                                                    fluidRow(
                                                                      column(2, "Data"),
                                                                      #input to select which data type is displayed on the x-axis
-                                                                     column(5,
-                                                                            selectInput("datatype_zoom_x", NULL,c("DNA Copy Number"), selectize=FALSE)
+                                                                     column(5, uiOutput("x_zoom_datatype_selector")
                                                                      ),
                                                                      #input to select which data type is displayed on the y-axis
-                                                                     column(5,
-                                                                            selectInput("datatype_zoom_y", NULL, c("DNA Copy Number"),selectize=FALSE)
+                                                                     column(5, uiOutput("y_zoom_datatype_selector")
                                                                      )
                                                                    ),
                                                                    #row to select which gene to view
@@ -182,7 +207,10 @@ ui <-
                                                                  )
                                                 )
                                          )
-                                       )
+                                       ),
+                                       br(),
+                                       br(),
+                                       br()
                               ),
                               #######################
                               ####### HEATMAP #######
@@ -195,15 +223,18 @@ ui <-
 ########################################################
 ######################## SERVER ########################
 ########################################################
+
+#connect to the database of registered users
+#Database structure:  username  |   hashed password   |   access level
+mydb <- dbConnect(RSQLite::SQLite(), "users_db.sqlite")
+
 server <- function(input, output, session) {
   
   ###############################
   ######## GENERAL SETUP ########
   ############################### 
   #Set up some aesthetics
-
   cbPalette <- c("#009E73", "#0072B2", "#CC79A7","#56B4E9","#F0E442")
-  
   ptBig = 5
   ptMed = 3
   ptSmol = 2
@@ -213,77 +244,69 @@ server <- function(input, output, session) {
   colRed = "#D55E00"
   colOrn = "#E69F00"
 
+  currentUser <- reactiveValues(username = "NULL", access_lvl = 1)
+  
   #intialize reactive values for points the user can choose to highlight by clicking on each plot
   points <- reactiveValues(pnt = NULL, pnt_zoom=NULL)
   plotdata <- reactiveValues(zoomdata=(NULL), highlightDF=(NULL), highlightzoomDF=(NULL))
   plottingdata <- NULL
+  
   ##################################
   #for the left ("zoomed"-out") plot
   ##################################
   #Read in data for the x and y coordinates of the plot
   database_dataframe <- readRDS("database_table")
-  datatype_options <- reactive({
-    return(database_dataframe[,1])
-  })
-  inputdata_x <- reactive({
-    return(readRDS(toString(database_dataframe[database_dataframe[,"Label"]==toString(x_datatype_sel()),2])))
-  })
-  inputdata_y <- reactive({
-    return(readRDS(toString(database_dataframe[database_dataframe[,"Label"]==toString(y_datatype_sel()),2])))
-  })
+  datatype_options <- reactive({ return(database_dataframe[database_dataframe$access_lvl<=currentUser$access_lvl,1]) })
+  
+  inputdata_x <- reactive({ return(readRDS(toString(database_dataframe[database_dataframe[,"Label"]==toString(x_datatype_sel()),2]))) })
+  inputdata_y <- reactive({ return(readRDS(toString(database_dataframe[database_dataframe[,"Label"]==toString(y_datatype_sel()),2]))) })
   
   x_datatype_sel <- reactive ({
+    #when the user changes what gene to display, clear the highlighted points the user selected by clicking on the plot
     clearPoints()
-    return(input$x_datatype)
+    return(input$datatype_x)
   })
   y_datatype_sel <- reactive ({
-    clearPoints()
-    return(input$y_datatype)
-  })
-  #Have the user select which genes to display on the x and y axis respectively
-  x_sel <- reactive({
     #when the user changes what gene to display, clear the highlighted points the user selected by clicking on the plot
     clearPoints()
-    return(input$gene_x)
+    return(input$datatype_y)
   })
-  y_sel <- reactive({
-    #when the user changes what gene to display, clear the highlighted points the user selected by clicking on the plot
-    clearPoints()
-    return(input$gene_y)
-  }) 
   
-  #Have the user select which datatypes to go with the genes to display on the x and y axis respectively
-  x_datatype <- reactive({return(input$datatype_x)})
-  y_datatype <- reactive({return(input$datatype_y)})
+  #Have the user select which genes to display on the x and y axis respectively
+  x_sel <- reactive({ return(input$gene_x) })
+  y_sel <- reactive({ return(input$gene_y) }) 
+  
+  optionsA <- reactive({
+    common <- sort(intersect(inputdata_x()$SYMBOL, inputdata_y()$SYMBOL))
+    return(common)
+  })
   
   #################################
   #For the right ("zoomed-in") plot
   #################################
-  #Have the user select which genes to display on the x and y axis respectively
-  x_zoom_sel <- reactive({
-    #when the user changes what gene to display, clear the highlighted points the user selected by clicking on the plot
-    return(input$gene_zoom_x)
-  })
-  y_zoom_sel <- reactive({
-    #when the user changes what gene to display, clear the highlighted points the user selected by clicking on the plot
+  inputdata_zoom_x <- reactive({ return(readRDS(toString(database_dataframe[database_dataframe[,"Label"]==toString(x_zoom_datatype()),2]))) })
+  inputdata_zoom_y <- reactive({ return(readRDS(toString(database_dataframe[database_dataframe[,"Label"]==toString(y_zoom_datatype()),2]))) })
   
-    return(input$gene_zoom_y)
-  })
   #Have the user select which datatypes to go with the genes to display on the x and y axis respectively
   x_zoom_datatype <- reactive({return(input$datatype_zoom_x)})
   y_zoom_datatype <- reactive({return(input$datatype_zoom_y)})
+  
+  #Have the user select which genes to display on the x and y axis respectively
+  x_zoom_sel <- reactive({ return(input$gene_zoom_x) })
+  y_zoom_sel <- reactive({ return(input$gene_zoom_y) })
+  
+  optionsB <- reactive({
+    common <- sort(intersect(inputdata_x()$SYMBOL, inputdata_y()$SYMBOL))
+    return(common)
+  })
 
   ##################
   #Read in RDS files
   ##################
   #Read in the selection options for x_sel, y_sel, x_zoom_sel, and y_zoom_sel
-  DNAcopy_options <- reactive({
-    file <- readRDS("DNAcopy_options_CCLE_copynumber_byGene_2013-12-03")
-    return(file)
-  })
+
   
   #Read in the options for the user to select and highlight specific cancer type(s)
-
   cancer_options <- readRDS("cancerTypes_CCLE_copynumber_byGene_2013-12-03")
   
   #Holds the list of cancer types the user has selected to highlight
@@ -296,17 +319,21 @@ server <- function(input, output, session) {
   ######## CHECK EVENT FLAGS ########
   ###################################
   #values for event flags
-  flags <- reactiveValues(brushActive = FALSE,  showTable = FALSE, tableHasSelected = FALSE, showZoomTable = FALSE, zoomTableHasSelected = FALSE, defaultZoomView = TRUE)
+  flags <- reactiveValues(brushActive = FALSE,  showTable = FALSE, tableHasSelected = FALSE, showZoomTable = FALSE, zoomTableHasSelected = FALSE, defaultZoomView = TRUE, loggedIn = FALSE)
+  
   output$brushActive <- reactive({ return(flags$brushActive) })
   output$showTable <- reactive({ return(flags$showTable)} )
   output$tableHasSelected <- reactive({ return(flags$tableHasSelected) })
   output$showZoomTable <- reactive({ return(flags$showZoomTable)})
   output$zoomTableHasSelected <- reactive({ return(flags$zoomTableHasSelected) })
+  output$loggedIn <- reactive({ return(flags$loggedIn) })
+  
   outputOptions(output, name = "brushActive", suspendWhenHidden = FALSE)
   outputOptions(output, name = "showTable", suspendWhenHidden = FALSE)
   outputOptions(output, name = "tableHasSelected", suspendWhenHidden = FALSE)
   outputOptions(output, name = "showZoomTable", suspendWhenHidden = FALSE)
   outputOptions(output, name = "zoomTableHasSelected", suspendWhenHidden = FALSE)
+  outputOptions(output, name = "loggedIn", suspendWhenHidden = FALSE)
   
   #Check to see if the brush is active
   observeEvent(plotdata$zoomdata, {
@@ -332,33 +359,55 @@ server <- function(input, output, session) {
   #If the user has selected data points with the brush, save them to the reactiveValue "zoomdata"
   observeEvent(input$plot_brush,{plotdata$zoomdata <- brushedPoints(defaultplotdata,input$plot_brush)})
   
-  observeEvent(input$showSelectedOnly,{
+  toListenCancerSelectionChange <- reactive({
+    list(input$showSelectedOnly,input$cancer_selection)
+  })
+  observeEvent(toListenCancerSelectionChange(),{
     if (input$showSelectedOnly){
-      makeTable(plotdata$highlightDF,x_sel(),y_sel())
-      makeZoomTable(plotdata$highlightzoomDF,x_zoom_sel(),y_zoom_sel())
+      makeTable(plotdata$highlightDF)
+      makeZoomTable(plotdata$highlightzoomDF)
     }
     else{
-      makeTable(defaultplotdata,x_sel(),y_sel())
-      makeZoomTable(plottingdata,x_zoom_sel(),y_zoom_sel())
+      makeTable(defaultplotdata)
+      makeZoomTable(plottingdata)
     }
   })
-  observeEvent(input$cancer_selection,{
+  
+  toListenTable <- reactive({
+    list(input$datatype_x, input$gene_x, input$datatype_y, input$gene_y)
+  })
+  observeEvent(toListenTable(),{
     if (input$showSelectedOnly){
-      makeTable(plotdata$highlightDF,x_sel(),y_sel())
-      makeZoomTable(plotdata$highlightzoomDF,x_zoom_sel(),y_zoom_sel())
+      makeTable(plotdata$highlightDF)
     }
     else{
-      makeTable(defaultplotdata,x_sel(),y_sel())
-      makeZoomTable(plottingdata,x_zoom_sel(),y_zoom_sel())
+      makeTable(defaultplotdata)
     }
   })
+  
+  toListenZoomTable <- reactive({
+    list(input$datatype_zoom_x, input$gene_zoom_x, input$datatype_zoom_y, input$gene_zoom_y)
+  })
+  observeEvent(toListenZoomTable(),{
+    if (input$showSelectedOnly){
+      makeZoomTable(plotdata$highlightzoomDF)
+    }
+    else{
+      makeZoomTable(plottingdata)
+    }
+  })
+  
   #Observe whether the user has decided to toggle the data table on the left/"zoomed-out" plot for viewing
   observeEvent(input$show_table,{
     cat(file=stderr(), "observeEvent:  input$show_table", "\n")
     flags$showTable <- TRUE
-    makeTable(defaultplotdata,x_sel(),y_sel())
+    if (input$showSelectedOnly){
+      makeTable(plotdata$highlightDF)
+    }
+    else{
+      makeTable(defaultplotdata)
+    }
   })
-  
   observeEvent(input$hide_table,{
     cat(file=stderr(), "observeEvent:  input$hide_table", "\n")
     flags$showTable <- FALSE
@@ -378,9 +427,8 @@ server <- function(input, output, session) {
   observeEvent(input$show_zoom_table,{
     cat(file=stderr(), "observeEvent:  input$show_zoom_table", "\n")
     flags$showZoomTable <- TRUE
-    makeZoomTable(plottingdata,x_zoom_sel(),y_zoom_sel())
+    makeZoomTable(plottingdata)
   })
-  
   observeEvent(input$hide_zoom_table,{
     cat(file=stderr(), "observeEvent:  input$hide_zoom_table", "\n")
     flags$showZoomTable <- FALSE
@@ -397,16 +445,14 @@ server <- function(input, output, session) {
   })
   
   #If appropriate, make the table to display the data in the left/"zoomed-out" plot
-  makeTable <- function(data,x_axis,y_axis){
-    
+  makeTable <- function(data){
     if(flags$showTable){
       output$data_table <- DT::renderDataTable({
         cat(file=stderr(), "output$data_table", "\n")
-        displayTable <- datatable(data[,1:2],colnames = c(x_axis,y_axis))
+        displayTable <- datatable(data[,1:2],colnames = c(paste(x_sel(), x_datatype_sel(), sep="-"),paste(y_sel(), y_datatype_sel(), sep="-")))
         return(displayTable)
       })
     }
-
   } 
   
   defaultProxy = dataTableProxy('data_table')
@@ -419,16 +465,14 @@ server <- function(input, output, session) {
   })
   
   #If appropriate, make the table to display the data in the right/"zoomed-in" plot
-  makeZoomTable <- function(data,x_axis,y_axis){
-    
+  makeZoomTable <- function(data){
     if(flags$showZoomTable){
       output$zoom_table <- DT::renderDataTable({
         cat(file=stderr(), "output$zoom_table", "\n")
-        displayTable <- datatable(data[,1:2],colnames = c(x_axis,y_axis))
+        displayTable <- datatable(data[,1:2],colnames = c(paste(x_zoom_sel(), x_zoom_datatype(), sep="-"),paste(y_zoom_sel(), y_zoom_datatype(), sep="-")))
         return(displayTable)
       })
     }
-    
   }
   
   zoomProxy = dataTableProxy('zoom_table')
@@ -440,6 +484,221 @@ server <- function(input, output, session) {
     flags$zoomTableHasSelected <- FALSE
   })
   
+
+  ##################################
+  ######## LOGGING IN / OUT ########
+  ##################################
+  #If the user clicks the login button, check to see if their credientials are valid and log the user in if they are
+  observeEvent(input$loginButt,{
+    #get user inputs
+    username <- isolate(input$inputUser)
+    
+    #send a parameterized query to the database and see if a user with the inputted name exists in the users table
+    query <- dbSendQuery(mydb, "SELECT * FROM users WHERE user = ? COLLATE NOCASE")
+    dbBind(query,list(username))
+    userfromtable <- dbFetch(query)
+    dbClearResult(query)
+    
+    #If the entered username exists in the database, compare the entered password and stored password using the hashpw() function
+    if(nrow(userfromtable) !=0 ){
+      
+      #Get the entered password and the stored hashed password
+      passwordguess <- isolate(input$inputPass)
+      password <- userfromtable$password
+      
+      #check if the entered password and the stored password match.  If they do, log the user in
+      flags$loggedIn <- (hashpw(passwordguess, password)==password)
+      
+      #If the login was successful...
+      if(flags$loggedIn){
+        #clear the input boxes and error message
+        updateTextInput(session, "inputUser", value = "") 
+        updateTextInput(session, "inputPass", value = "") 
+        output$loginError <- renderText({""})
+        
+        #Store the user's username and access level in the currentUser variable, and then welcome the user by name
+        currentUser$username <- userfromtable$user
+        currentUser$access_lvl <- userfromtable$access_lvl
+        output$userinfo <- renderText({
+          HTML(paste("Currently logged in as ",as.character(currentUser$username)))
+        })
+      }
+      
+      #If the login was unsuccessful, clear the password input box and display an error
+      else{
+        updateTextInput(session, "inputPass", value = "")
+        output$loginError <- renderText({
+          "Error logging in.  Please check your username and password."
+        })
+      }
+    }
+    
+    #if the entered user doesn't exist in the database, set the flag to show that the current user is not logged in. clear the password entry box, and display an error
+    else{ 
+      flags$loggedIn <- FALSE 
+      updateTextInput(session, "inputPass", value = "")
+      output$loginError <- renderText({
+        "Error logging in.  Please check your username and password."
+        })
+      }
+  })
+  
+  #If the user clicks the logout button, log them out and clear the welcome text field.
+  observeEvent(input$logoutButt,{
+    flags$loggedIn <- FALSE
+    currentUser$username <- "NULL"
+    currentUser$access_lvl <- 1
+    output$userinfo <- renderText({""})
+  })
+  
+  #If the user clicks the register action link, bring up a modal form to let them make an account
+  #Requirements for a new account:  Unique username of at least 4 characters, unique e-mail, and password of at least 6 characters
+  observeEvent(input$registerButt,{
+    #bring up the modal with entry fields for usename, e-mail, and password as well as error fields
+    showModal(modalDialog(
+      title = "New User Registration",
+      "Please fill out the fields below",
+      br(), br(),
+      textInput("newUser", "Username (at least 4 characters)", placeholder = 'username'),
+      textInput("newEmail", "E-mail", placeholder = 'e-mail'),
+      passwordInput("newPass1", "Password (at least 6 characters)", placeholder = 'password'),
+      passwordInput("newPass2", "Confirm Password", placeholder = 'password'),
+      br(),
+      div(style="color:red;",textOutput("regError")),
+      div(style="color:red;",textOutput("emailError")),
+      br(),
+      div(style="color:red;",textOutput("passError1")),
+      div(style="color:red;",textOutput("passError2")),
+      easyClose = TRUE,
+      
+      #Submit and exit buttons
+      footer = tagList(
+        actionButton("newUserButt", "Submit"),
+        modalButton("Cancel")
+      )
+    ))
+    
+    #clear error outputs upon opening modal
+    output$regError <- renderText({ "" })
+    output$emailError <- renderText({ "" })
+    output$passError1 <- renderText({ "" })
+    output$passError2 <- renderText({ "" })
+  })
+  
+  #Verify the entry fields when the user clicks the submit button on the user registration modal
+  observeEvent(input$newUserButt,{
+    #Assume everything is horribly wrong to start off until the user leads us to believe otherwise
+    #Requirements for a new account:  Unique username of at least 4 characters, unique e-mail, and password of at least 6 characters
+    nameOK <- FALSE
+    namelengthOK <- FALSE
+    passOK <- FALSE
+    passlengthOK <- FALSE
+    emailOK <- FALSE
+    emailformatOK <- FALSE
+    
+    #Get user inputs from the modal
+    newusername <- isolate(input$newUser)
+    newemail <- isolate(input$newEmail)
+    newpass <- isolate(input$newPass1)
+    
+    #Check if the enteres usernames is ok (correct minimum length and is not already taken)
+    namelengthOK <- (nchar(newusername) >= 4)
+    
+    #If the length is ok, then let us check if the username is already taken
+    if(namelengthOK){
+      #clear the error message to start off with
+      output$regError <- renderText({ "" })
+      
+      #check to see if the username is already taken using a prepared query
+      query <- dbSendQuery(mydb, "SELECT * FROM users WHERE user = ? COLLATE NOCASE")
+      dbBind(query,list(newusername))
+      returnUser <- dbFetch(query)
+      
+      #If a dataframe with no rows is returned by the above query, it means that the username is not taken
+      nameOK <- (nrow(returnUser) == 0)
+      #If the name is not taken, clear the error message.  If it is, let the user know the name is taken.
+      if(nameOK){
+        output$regError <- renderText({ "" })
+      }
+      else{
+        output$regError <- renderText({ "That username is taken.  Please choose a new username." })
+      }
+      dbClearResult(query)
+    }
+    #If the length of the username is too short, let the user know
+    else{
+      output$regError <- renderText({ "Your username is too short.  Please choose something longer." })
+    }
+    
+    #Check if a valid e-mail format is entered by seeing if the '@' symbol is in the email.
+    emailformatOK <- grepl("@",newemail)
+    
+    #If the e-mail format is ok, check and make sure that the e-mail is not already taken
+    if(emailformatOK){
+      #parameterized query to see if a user with the same e-mil already exists in the database
+      output$emailError <- renderText({ "" })
+      emailquery <- dbSendQuery(mydb, "SELECT * FROM users WHERE email = ? COLLATE NOCASE")
+      dbBind(emailquery,list(newemail))
+      returnemail <- dbFetch(emailquery)
+      
+      #If a dataframe with no rows is returned by the above query, it means that the e-mail is not taken
+      emailOK <- (nrow(returnemail) == 0 )
+      #If the e-mail is not taken, clear the error message.  If it is, let the user know the e-mail is taken.
+      if(emailOK){
+        output$emailError <- renderText({ "" })
+      }
+      else{
+        output$emailError <- renderText({ "That e-mail is already taken.  Please choose a new e-mail." })
+      }
+      dbClearResult(emailquery)
+    }
+    #If the e-mail format is not ok, let the user know
+    else{
+      output$emailError <- renderText({ "Please enter a valid e-mail" })
+    }
+    
+    #See if the passwords entered match and if they are of the correct length
+    passOK <- (input$newPass1 == input$newPass2)
+    passlengthOK <- (nchar(input$newPass1) >= 6)
+    #output an error message about password length to the user if need be
+    if(passlengthOK){
+      output$passError1 <- renderText({ "" })
+    }
+    else{
+      output$passError1 <- renderText({ "Your password is too short.  Please choose something longer." })
+    }
+    
+    #output an error message about not matching passwords to the user if need be
+    if(passOK){
+      output$passError2 <- renderText({ "" })
+    }
+    else{
+      output$passError2 <- renderText({ "Please ensure that both passwords match." })
+    }
+    
+    #If ther user's entered info passes all of the checks, add them to the user database
+    if(namelengthOK && nameOK && passlengthOK && passOK && emailformatOK && emailOK){
+      statement <- dbSendStatement(mydb, "INSERT INTO users (user, email, password, access_lvl) VALUES (?, ?, ?, 1)")
+      dbBind(statement,list(newusername, newemail, hashpw(newpass)))
+      returnUser <- dbFetch(statement)
+      cat(file=stderr(), "New user successfully created", "\n")
+      
+      #Automatically log in the user
+      output$loginError <- renderText({""})
+      flags$loggedIn <- TRUE
+      #Store the user's username and access level in the currentUser variable, and then welcome the user by name
+      currentUser$username <- newusername
+      currentUser$access_lvl <- 1
+      output$userinfo <- renderText({
+        HTML(paste("Currently logged in as ",as.character(currentUser$username)))
+      })
+      cat(file=stderr(), "New user successfully logged in", "\n")
+      #Close the modal
+      removeModal()
+      dbClearResult(statement)
+    }
+    
+  })
   
   #######################################
   ####### RENDERING USER OPTIONS ########
@@ -453,37 +712,46 @@ server <- function(input, output, session) {
     cat(file=stderr(), "output$cancer_selector", "\n")
     selectizeInput("cancer_selection", NULL, cancer_options, selected=NULL, multiple=TRUE,options = list(maxItems = 5))
   })
-  
   output$x_datatype_selector <- renderUI({
     cat(file=stderr(), "output$x_datatype_selector", "\n")
-    selectInput("x_datatype", NULL, datatype_options(), selectize=FALSE)
+    selectInput("datatype_x", NULL, datatype_options(), selectize=FALSE)
   })
   
   output$y_datatype_selector <- renderUI({
     cat(file=stderr(), "output$y_datatype_selector", "\n")
-    selectInput("y_datatype", NULL, datatype_options(), selectize=FALSE)
+    selectInput("datatype_y", NULL, datatype_options(), selectize=FALSE)
   })
   
   output$gene_x_selector <- renderUI({
     cat(file=stderr(), "output$gene_x_selector", "\n")
-    selectInput("gene_x", NULL, DNAcopy_options(), selectize=FALSE)
+    selectInput("gene_x", NULL, optionsA(), selected=x_sel(), selectize=FALSE)
   })
   
   output$gene_y_selector <- renderUI({
     cat(file=stderr(), "output$gene_y_selector", "\n")
-    selectInput("gene_y", NULL, DNAcopy_options(), selectize=FALSE)
+    selectInput("gene_y", NULL, optionsA(), selected=y_sel(), selectize=FALSE)
   })
   
+  output$x_zoom_datatype_selector <- renderUI({
+    cat(file=stderr(), "output$x_datatype_selector", "\n")
+    selectInput("datatype_zoom_x", NULL, datatype_options(), selected=x_datatype_sel(), selectize=FALSE)
+  })
+  
+  output$y_zoom_datatype_selector <- renderUI({
+    cat(file=stderr(), "output$y_datatype_selector", "\n")
+    selectInput("datatype_zoom_y", NULL, datatype_options(), selected=y_datatype_sel(), selectize=FALSE)
+  })
+
   output$gene_zoom_x_selector <- renderUI({
     cat(file=stderr(), "output$gene_zoom_x_selector", "\n")
     y_sel()
-    return(selectInput("gene_zoom_x", NULL, DNAcopy_options(),selected=x_sel(), selectize=FALSE))
+    return(selectInput("gene_zoom_x", NULL, optionsB(),selected=x_sel(), selectize=FALSE))
   })
 
   output$gene_zoom_y_selector <- renderUI({
     cat(file=stderr(), "output$gene_zoom_y_selector", "\n")
     x_sel()
-    return(selectInput("gene_zoom_y", NULL, DNAcopy_options(),selected=y_sel(), selectize=FALSE))
+    return(selectInput("gene_zoom_y", NULL, optionsB(),selected=y_sel(), selectize=FALSE))
   })
   
 
@@ -491,17 +759,22 @@ server <- function(input, output, session) {
   ##################################
   ####### RENDERING OUTPUTS ########
   ##################################
+  
+  #output user info
 
   #output the left/"zoomed-out" plot
   output$plot<- renderPlot({ 
     cat(file=stderr(), "output$plot", "\n")
     #Select the appropriate rows from our database table based on user input
       #Get the x and y values of interest and save them to a data frame
-       x <- sapply(inputdata_x()[inputdata_x()[,"SYMBOL"]==x_sel(),-1], as.numeric)
-       y <- sapply(inputdata_y()[inputdata_y()[,"SYMBOL"]==y_sel(),-1], as.numeric)
+       x <- data.frame(sapply(inputdata_x()[inputdata_x()[,"SYMBOL"]==x_sel(),-1], as.numeric))
+       y <- data.frame(sapply(inputdata_y()[inputdata_y()[,"SYMBOL"]==y_sel(),-1], as.numeric))
       
       #make the dataframe to hold the information we're displaying in the scatterplot
-      defaultplotdata <<- data.frame(x = x, y = y)
+      defaultplotdata <<- merge(x,y, by="row.names")
+      colnames(defaultplotdata) <<- c("cell","x","y")
+      rownames(defaultplotdata) <<- defaultplotdata[,1]
+      defaultplotdata$cell <<- NULL
       
       #make columns for cancer type and cell line name
       underscore <- regexpr("_",rownames(defaultplotdata))
@@ -511,7 +784,7 @@ server <- function(input, output, session) {
       defaultplotdata <<- cbind(defaultplotdata,line)
       
       #if the user has the "Show selected cancers only" box checked off, only show the cancers of interest
-      defaultplot <<- ggplot() + labs(x = paste(x_sel()," - ",x_datatype()), y = paste(y_sel()," - ",y_datatype()), title = "Test Scatter")
+      defaultplot <<- ggplot() + labs(x = paste(x_sel()," - ",x_datatype_sel()), y = paste(y_sel()," - ",y_datatype_sel()), title = "Test Scatter")
       
       #if the user does not have that option checked, add in the rest of the points, too
       if(!input$showSelectedOnly){
@@ -527,13 +800,23 @@ server <- function(input, output, session) {
         matched_pnt_zoom <- updatePoint(points$pnt_zoom,defaultplotdata)
         defaultplot <<- plotPointOnClick(defaultplot, input$plot_zoom_click, matched_pnt_zoom, colOrn, ptMed, updatePoint = FALSE)
       }
-      
+      #make sure the same point is saved between axis changes
+      if(!is.null(points$pnt)){
+        points$pnt <- isolate(updatePoint(points$pnt,defaultplotdata))
+      }
       #Add in user-selected highlights from the printed data table
       tableHighlights = input$data_table_rows_selected
-      #print("tableHighlights")
-      #print(tableHighlights)
+      print("tableHighlights")
+      print(tableHighlights)
       if(length(tableHighlights)){
-        defaultplot <<- defaultplot + geom_point(data = defaultplotdata[tableHighlights,], aes(x,y), color=colRed, size = ptSmol)
+        print(defaultplotdata[tableHighlights,])
+        print(plotdata$highlightDF[tableHighlights,])
+        if (input$showSelectedOnly){
+          defaultplot <<- defaultplot + geom_point(data = plotdata$highlightDF[tableHighlights,], aes(x,y), color=colRed, size = ptSmol)
+        }
+        else{
+          defaultplot <<- defaultplot + geom_point(data = defaultplotdata[tableHighlights,], aes(x,y), color=colRed, size = ptSmol)
+        }
       }
       
       #Add user-clicked highlighted points
@@ -565,8 +848,8 @@ server <- function(input, output, session) {
   output$click_info <- renderTable({
     cat(file=stderr(), "output$click_info", "\n")
     if(!is.null(input$plot_click)){}
-    printPoint(points$pnt,x_sel(),y_sel())
-  },bordered = TRUE, spacing = 'xs', rownames = TRUE,colnames = TRUE)
+    printPoint(points$pnt,x_sel(),y_sel(),x_datatype_sel(),y_datatype_sel())
+  },bordered = TRUE, spacing = 'xs', rownames = TRUE,colnames = TRUE,sanitize.text.function=function(x){x})
 
   #output the right/"zoomed-in" plot
   output$plot_zoom<- renderPlot({
@@ -582,12 +865,18 @@ server <- function(input, output, session) {
       
       if(!flags$defaultZoomView){
         #Get the x and y values of interest and save them to a data frame
-        x <- sapply(inputdata_x()[inputdata_x()[,"SYMBOL"]==x_zoom_sel(),-1], as.numeric)
-        y <- sapply(inputdata_y()[inputdata_y()[,"SYMBOL"]==y_zoom_sel(),-1], as.numeric)
+        x2 <- data.frame(sapply(inputdata_zoom_x()[inputdata_zoom_x()[,"SYMBOL"]==x_zoom_sel(),-1], as.numeric))
+        y2 <- data.frame(sapply(inputdata_zoom_y()[inputdata_zoom_y()[,"SYMBOL"]==y_zoom_sel(),-1], as.numeric))
+        
         #make the dataframe to hold the information we're displaying in the scatterplot
         cancersOfInterest <- row.names(plotdata$zoomdata)
         
-        newDF <<- data.frame(x = x, y = y)[cancersOfInterest,]
+        newDF <<-  merge(x2,y2, by="row.names")
+        colnames(newDF) <<- c("cell","x","y")
+        rownames(newDF) <<- newDF[,1]
+        newDF$cell <<- NULL
+        newDF <<- newDF[cancersOfInterest,]
+        
         #make columns for cancer type and cell line name
         underscore <- regexpr("_",rownames(plotdata$zoomdata))
         line <- substring(rownames(plotdata$zoomdata), 1, underscore-1)
@@ -597,13 +886,13 @@ server <- function(input, output, session) {
         plottingdata<<-newDF
       
         #Determine if the new plotting dataset and the old one are the same or not.  If they are different, re-rendeer the displayed data table
-        if(!isTRUE(all.equal(plottingdata,oldplottingdata))){
-          makeZoomTable(plottingdata,x_zoom_sel(),y_zoom_sel())
-        }
+        # if(!isTRUE(all.equal(plottingdata,oldplottingdata))){
+        #   makeZoomTable(plottingdata,x_zoom_sel(),y_zoom_sel())
+        # }
       }
       
       #if the user has the "Show selected cancers only" box checked off, only show the cancers of interest
-      zoomplot<<-ggplot() + labs(x = paste(x_zoom_sel()," - ", x_datatype()), y = paste(y_zoom_sel()," - ",y_datatype()), title = "Test Scatter") 
+      zoomplot<<-ggplot() + labs(x = paste(x_zoom_sel()," - ", x_zoom_datatype()), y = paste(y_zoom_sel()," - ",y_zoom_datatype()), title = "Test Scatter") 
       
       #if the user does not have that option checked, add in the rest of the points, too
       if(!input$showSelectedOnly){
@@ -618,7 +907,13 @@ server <- function(input, output, session) {
       #print("zoomtablehighlights")
       #print(tableHighlights)
       if(length(tableHighlights)){
-        zoomplot <<- zoomplot + geom_point(data = plottingdata[tableHighlights,], aes(x,y), color=colOrn, size = ptSmol)
+        if (input$showSelectedOnly){
+          zoomplot <<- zoomplot + geom_point(data = plotdata$highlightzoomDF[tableHighlights,], aes(x,y), color=colOrn, size = ptSmol)
+          }
+        else{
+          zoomplot <<- zoomplot + geom_point(data = plottingdata[tableHighlights,], aes(x,y), color=colOrn, size = ptSmol)
+        }
+        #zoomplot <<- zoomplot + geom_point(data = plottingdata[tableHighlights,], aes(x,y), color=colOrn, size = ptSmol)
       }
       
       #make sure the same point is saved between axis changes
@@ -658,8 +953,8 @@ server <- function(input, output, session) {
   output$zoom_click_info <- renderTable({
     cat(file=stderr(), "output$zoom_click_info", "\n")
     if(!is.null(input$plot_zoom_click)){}
-    printPoint(points$pnt_zoom,x_zoom_sel(),y_zoom_sel())
-  },bordered = TRUE, spacing = 'xs', rownames = TRUE,colnames = TRUE)
+    printPoint(points$pnt_zoom,x_zoom_sel(),y_zoom_sel(),x_zoom_datatype(),y_zoom_datatype())
+  },bordered = TRUE, spacing = 'xs', rownames = TRUE,colnames = TRUE,sanitize.text.function=function(x){x})
   
   #################################
   ######## VARIOUS FUNTIONS #######
@@ -683,36 +978,50 @@ server <- function(input, output, session) {
   
   #Print the cancer line and cancer type associated with the passed in point
   printInfo <- function(point){
-   
     print("pointprintnfo")
-    str1 <- paste("Cell Line:  ", point$line)
-    str2 <-paste("Cancer Type:  ", point$cancer)
-
-    HTML(paste(str1,str2,sep='<br/>'))
+    if(!is.null(point) && (nrow(point)>0)){
+      print(point)
+      str1 <- paste("Cell Line:  ", point$line)
+      str2 <-paste("Cancer Type:  ", point$cancer) 
+      
+      HTML(paste(str1,str2,sep='<br/>'))
+    }
   }
   
   #Print data associated with the point (such as DNA copy number, mRNA, etc)
-  printPoint <- function(point,x_axis,y_axis){
+  printPoint <- function(point,x_axis,y_axis,x_dtype,y_dtype){
     cat(file=stderr(), "printPoint", "\n")
 
     #Make sure the point is valid before trying to do anything
     if(is.data.frame(point) && nrow(point)!=0) {
       #See if the x and y-axis are the same so that we don't mess up and have duplicate row names and make R throw a fit
-      if(x_axis != y_axis){
-        pointDetail <- data.frame(c(point$x, point$y))
-        row.names(pointDetail)<-c(x_axis,y_axis)
-      }
-      else{
+      if((x_axis == y_axis) && (x_dtype == y_dtype)){
         pointDetail <- data.frame(c(point$x))
         row.names(pointDetail)<-c(x_axis) 
+        names(pointDetail)<-c(x_dtype)
+      }
+      else if ((x_axis != y_axis) && (x_dtype == y_dtype)){
+        pointDetail <- data.frame(c(point$x, point$y))
+        row.names(pointDetail)<-c(x_axis, y_axis)
+        names(pointDetail)<-c(x_dtype)
+      }
+      else if((x_axis == y_axis) && (x_dtype != y_dtype)){
+        pointDetail <- data.frame(point$x, point$y)
+        row.names(pointDetail)<-c(x_axis)
+        names(pointDetail)<-c(x_dtype, y_dtype)
+      }
+      else{
+        p1 <- sapply(inputdata_y()[inputdata_y()[,"SYMBOL"]==x_axis,row.names(point)[1]], as.numeric)
+        p2 <- sapply(inputdata_x()[inputdata_x()[,"SYMBOL"]==y_axis,row.names(point)[1]], as.numeric)
+        cat(file=stderr(), as.character(p1), "\n")
+        pointDetail <- data.frame(c(paste("<strong>",point$x,"</strong>"), p2),c(p1,paste("<strong>",point$y,"</strong>")))
+        row.names(pointDetail)<-c(x_axis, y_axis)
+        names(pointDetail)<-c(x_dtype, y_dtype)
       }
       
       #add column names
-      names(pointDetail)<-c("DNA Copy #")
-      cat(file=stderr(), "printPoint done", "\n")
       return (pointDetail)
     }
-    cat(file=stderr(), "printPoint done?", "\n")
 
   }
   
@@ -723,7 +1032,7 @@ server <- function(input, output, session) {
     points$pnt_zoom <- NULL
   }
   
-  #take a "point" from a plot and return the correpsonding point in "data"
+  #take a "point" from a plot and return the correpsonding row in "data"
   updatePoint <- function(point, data){
     cat(file=stderr(), "updatePoint", "\n")
     return(data[row.names(point),])
